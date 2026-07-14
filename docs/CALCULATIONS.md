@@ -23,9 +23,9 @@ for an asset already held on that date.
 - **Week:** current last snapshot versus the last available snapshot inside the preceding Monday–Sunday week.
 - **Month:** current last snapshot versus the last available snapshot inside the preceding calendar month.
 
-If the required previous period has no snapshot, the UI shows that there is no reference snapshot instead of inventing a comparison. Changes use the difference in stored P&L, so a new contribution does not appear as investment performance.
+If the required previous period has no snapshot, the UI shows that there is no reference snapshot instead of inventing a comparison. Changes compare stored market values instrument by instrument and offset recorded buys and sells during the window. The ruble cash balance is excluded, so a transfer to the brokerage account does not look like investment performance. A broker-side correction of average cost or expected yield also does not masquerade as a market movement.
 
-The leaders list uses the same reference periods. For each instrument it compares stored position values and offsets recorded buys and sells during the window. Items are sorted by the absolute ruble impact on the portfolio.
+The leaders list uses the same reference periods and the same calculation as the headline change. Its signed ruble contributions therefore add up to the headline value. Items are sorted by the absolute ruble impact on the portfolio.
 
 ## Deposits
 

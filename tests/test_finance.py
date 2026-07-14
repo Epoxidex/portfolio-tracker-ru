@@ -5,7 +5,7 @@ import pytest
 
 from app.models import Instrument, Snapshot, Transaction
 from app.services.portfolio import deposit_value_from_meta, _moving_average_book, positions
-from app.services.snapshots import compute_leaders, compute_returns
+from app.services.snapshots import compute_leaders, compute_returns, compute_streak
 from app.services.tinvest import _sync_portfolio_state
 
 
@@ -128,11 +128,11 @@ def test_moving_average_cost_handles_sell_then_repurchase():
     assert realized == pytest.approx(100)
 
 
-def _snapshot(day, pnl, *, value=None, by_instrument=None):
+def _snapshot(day, pnl, *, value=None, invested=1_000, by_instrument=None):
     return Snapshot(
         ts=datetime.fromisoformat(day + "T12:00:00"),
         total_value=value if value is not None else 1_000 + pnl,
-        total_invested=1_000,
+        total_invested=invested,
         total_pnl=pnl,
         income_received=0,
         by_class={},
@@ -169,3 +169,28 @@ def test_leaders_are_sorted_by_absolute_portfolio_impact(db):
     assert result["complete"] is True
     assert [item["name"] for item in result["items"]] == ["A", "B"]
     assert [item["change"] for item in result["items"]] == [50, -30]
+
+
+def test_returns_match_leaders_when_broker_cost_basis_changes(db):
+    asset = Instrument(kind="share", name="Asset", ticker="AST", currency="RUB")
+    cash = Instrument(kind="currency", name="Ruble cash", currency="RUB")
+    db.add_all([asset, cash])
+    db.add_all([
+        _snapshot(
+            "2026-07-13", 0, value=1_100, invested=1_000,
+            by_instrument={"Asset": 1_000, "Ruble cash": 100},
+        ),
+        _snapshot(
+            "2026-07-14", -483.03, value=1_316.61, invested=1_649.64,
+            by_instrument={"Asset": 1_166.61, "Ruble cash": 150},
+        ),
+    ])
+    db.commit()
+
+    returns = compute_returns(db, "daily")
+    leaders = compute_leaders(db, "day")
+
+    assert returns["today"]["change"] == 166.61
+    assert returns["today"]["pct"] == pytest.approx(0.16661)
+    assert sum(item["change"] for item in leaders["items"]) == 166.61
+    assert compute_streak(db) == 1

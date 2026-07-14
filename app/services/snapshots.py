@@ -47,22 +47,85 @@ def history(db, limit=2000):
         "value": r.total_value, "invested": r.total_invested,
         "pnl": r.total_pnl, "income": r.income_received,
         "by_class": r.by_class,
+        "by_instrument": r.by_instrument or {},
     } for r in sorted(by_day.values(), key=lambda x: x.ts)]
 
 
+def _instrument_changes(db, reference, current):
+    """Return cash-flow-adjusted market changes between two snapshots.
+
+    The portfolio headline and the leaders list intentionally share this path.
+    Broker cost-basis corrections affect stored P&L, but they are not market
+    movements and must not appear as period returns.
+    """
+    current_values = current.by_instrument or {}
+    reference_values = reference.by_instrument or {}
+    instruments = {i.name: i for i in db.query(Instrument).all()}
+    flows = {}
+    purchases = {}
+    tx_rows = (db.query(Transaction)
+               .filter(Transaction.instrument_id.isnot(None),
+                       Transaction.ts > _portfolio_day(reference.ts),
+                       Transaction.ts <= _portfolio_day(current.ts))
+               .all())
+    for tx in tx_rows:
+        name = tx.instrument.name if tx.instrument else None
+        if not name:
+            continue
+        amount = float(tx.amount or 0)
+        flows[name] = flows.get(name, 0.0) + amount
+        if tx.kind in {"buy", "fx_buy"} and amount < 0:
+            purchases[name] = purchases.get(name, 0.0) - amount
+
+    items = []
+    base_total = 0.0
+    for name in set(current_values) | set(reference_values):
+        current_value = float(current_values.get(name, 0) or 0)
+        reference_value = float(reference_values.get(name, 0) or 0)
+        inst = instruments.get(name)
+        if inst and inst.kind == "currency" and inst.currency == "RUB":
+            continue
+        change = current_value - reference_value + flows.get(name, 0.0)
+        base_value = reference_value + purchases.get(name, 0.0)
+        base_total += max(0.0, base_value)
+        if abs(change) < 0.005:
+            continue
+        change_pct = change / base_value if base_value else None
+        ticker = ""
+        if inst:
+            ticker = inst.ticker or (inst.currency if inst.kind == "currency" else "")
+        items.append({
+            "name": name,
+            "ticker": ticker or name.split()[0],
+            "kind": inst.kind if inst else "",
+            "value": round(current_value, 2),
+            "change": round(change, 2),
+            "change_pct": round(change_pct, 6) if change_pct is not None else None,
+        })
+
+    items.sort(key=lambda item: abs(item["change"]), reverse=True)
+    return items, base_total
+
+
 def compute_streak(db) -> int:
-    """Consecutive days with strictly positive P&L change (market return > 0).
-    Uses pnl = value - invested, so deposit inflows don't inflate the streak."""
+    """Consecutive snapshot days with positive cash-flow-adjusted movement."""
     rows = db.query(Snapshot).order_by(Snapshot.ts.desc()).limit(800).all()
     by_day: dict = {}
     for r in rows:
         day = _portfolio_day(r.ts)
         if day not in by_day:
-            by_day[day] = {"value": r.total_value, "pnl": r.total_pnl}
+            by_day[day] = r
     days = sorted(by_day.keys(), reverse=True)
     streak = 0
     for i in range(len(days) - 1):
-        if by_day[days[i]]["pnl"] > by_day[days[i + 1]]["pnl"]:
+        current = by_day[days[i]]
+        reference = by_day[days[i + 1]]
+        if current.by_instrument and reference.by_instrument:
+            items, _ = _instrument_changes(db, reference, current)
+            change = sum(item["change"] for item in items)
+        else:
+            change = current.total_pnl - reference.total_pnl
+        if change > 0:
             streak += 1
         else:
             break
@@ -80,15 +143,29 @@ def compute_returns(db, period: str = "monthly") -> dict:
       ytd:   {change, pct}  — с начала года
     """
     hist = history(db)  # one per day, sorted asc
+    snapshot_by_ts = {
+        row.ts.isoformat(): row
+        for row in db.query(Snapshot).order_by(Snapshot.ts).all()
+    }
 
     def _delta(a, b):
-        """Изменение P&L с a до b — без учёта пополнений.
-        Знаменатель = invested[b] (текущие вложения) — та же база что и P&L% в KPI.
-        Так все % согласованы: delta_today/month/ytd сопоставимы с P&L% на карточке."""
+        """Cash-flow-adjusted market movement from snapshot ``a`` to ``b``."""
         if not a or not b or b.get("invested", 0) == 0:
             return {"change": None, "pct": None}
-        change = b["pnl"] - a["pnl"]          # изменение прибыли (пополнения не влияют)
-        pct = change / b["invested"]           # % от текущих вложений
+        if a.get("by_instrument") and b.get("by_instrument"):
+            reference = snapshot_by_ts.get(a["ts"])
+            current = snapshot_by_ts.get(b["ts"])
+            if reference and current:
+                items, base_total = _instrument_changes(db, reference, current)
+                change = sum(item["change"] for item in items)
+                pct = change / base_total if base_total else None
+                return {
+                    "change": round(change, 2),
+                    "pct": round(pct, 6) if pct is not None else None,
+                }
+        # Backward compatibility for legacy snapshots without instrument detail.
+        change = b["pnl"] - a["pnl"]
+        pct = change / b["invested"]
         return {"change": round(change, 2), "pct": round(pct, 6)}
 
     # --- period points ---
@@ -229,51 +306,7 @@ def compute_leaders(db, period: str = "day") -> dict:
             "items": [], "complete": False,
         }
 
-    current_values = current.by_instrument or {}
-    reference_values = reference.by_instrument or {}
-    instruments = {i.name: i for i in db.query(Instrument).all()}
-    flows = {}
-    purchases = {}
-    tx_rows = (db.query(Transaction)
-               .filter(Transaction.instrument_id.isnot(None),
-                       Transaction.ts > _portfolio_day(reference.ts),
-                       Transaction.ts <= current_day)
-               .all())
-    for tx in tx_rows:
-        name = tx.instrument.name if tx.instrument else None
-        if not name:
-            continue
-        amount = float(tx.amount or 0)
-        flows[name] = flows.get(name, 0.0) + amount
-        if tx.kind in {"buy", "fx_buy"} and amount < 0:
-            purchases[name] = purchases.get(name, 0.0) - amount
-    items = []
-
-    for name in set(current_values) | set(reference_values):
-        current_value = float(current_values.get(name, 0) or 0)
-        reference_value = float(reference_values.get(name, 0) or 0)
-        inst = instruments.get(name)
-        if inst and inst.kind == "currency" and inst.currency == "RUB":
-            continue
-        change = current_value - reference_value + flows.get(name, 0.0)
-        if abs(change) < 0.005:
-            continue
-        base_value = reference_value + purchases.get(name, 0.0)
-        change_pct = change / base_value if base_value else None
-        ticker = ""
-        if inst:
-            ticker = inst.ticker or (inst.currency if inst.kind == "currency" else "")
-        items.append({
-            "name": name,
-            "ticker": ticker or name.split()[0],
-            "kind": inst.kind if inst else "",
-            "value": round(current_value, 2),
-            "change": round(change, 2),
-            "change_pct": round(change_pct, 6) if change_pct is not None else None,
-        })
-
-    items.sort(key=lambda item: abs(item["change"]), reverse=True)
-    items = items[:18]
+    items, _ = _instrument_changes(db, reference, current)
     total_impact = sum(abs(item["change"]) for item in items)
     for item in items:
         item["impact_pct"] = round(abs(item["change"]) / total_impact, 6) if total_impact else 0

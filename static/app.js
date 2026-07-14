@@ -188,6 +188,30 @@ const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, char => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;",
 })[char]);
 
+function reconciledRubles(items) {
+  const raw = items.map(item => Number(item.change || 0));
+  const displayed = raw.map(value => {
+    const truncated = Math.trunc(value);
+    return Object.is(truncated, -0) ? 0 : truncated;
+  });
+  const total = raw.reduce((sum, value) => sum + value, 0);
+  const target = Math.sign(total) * Math.round(Math.abs(total));
+  const remainder = target - displayed.reduce((sum, value) => sum + value, 0);
+  if (!remainder) return displayed;
+
+  const direction = Math.sign(remainder);
+  const order = raw.map((value, index) => ({
+    index,
+    fraction: value - displayed[index],
+  })).sort((a, b) => direction > 0
+    ? b.fraction - a.fraction
+    : a.fraction - b.fraction);
+  for (let step = 0; step < Math.abs(remainder); step += 1) {
+    displayed[order[step % order.length].index] += direction;
+  }
+  return displayed;
+}
+
 function renderLeaders(data) {
   const list = $("#leaders-list");
   const items = [...(data?.items || [])]
@@ -209,6 +233,7 @@ function renderLeaders(data) {
   }
 
   const maxChange = Math.max(...items.map(item => Math.abs(item.change || 0)), 1);
+  const displayedChanges = reconciledRubles(items);
   list.innerHTML = `
     <div class="leaders-list-head">
       <span></span><span>Инструмент</span><span>Изменение</span><span>Вклад в портфель</span>
@@ -221,7 +246,8 @@ function renderLeaders(data) {
       const priceChange = item.change_pct == null
         ? "новая позиция"
         : `${item.change_pct >= 0 ? "+" : ""}${(item.change_pct * 100).toFixed(2)}%`;
-      const contribution = `${positive ? "+" : ""}${fmt(item.change || 0, 0)}`;
+      const displayedChange = displayedChanges[index];
+      const contribution = `${displayedChange > 0 ? "+" : ""}${fmt(displayedChange, 0)}`;
       const impact = `${((item.impact_pct || 0) * 100).toFixed(1)}% движения`;
       const width = Math.max(1.5, Math.abs(item.change || 0) / maxChange * 100);
       return `<div class="leader-row ${direction}" style="--leader-width:${width.toFixed(1)}%">
