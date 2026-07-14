@@ -1,28 +1,28 @@
 # Portfolio Tracker RU
 
-A local-first web dashboard for a personal investment portfolio. It imports supported operations and prices from T-Invest, tracks manual bank deposits and foreign currency, stores historical snapshots in SQLite, and shows portfolio value, P&L, period changes, leaders and a payment calendar.
+Локальное веб-приложение для учёта личного инвестиционного портфеля. Оно импортирует поддерживаемые операции и цены из Т‑Инвестиций, учитывает банковские вклады и иностранную валюту, хранит историю в SQLite и показывает стоимость портфеля, доходность, изменения за разные периоды, лидеров роста и падения, а также календарь выплат.
 
-The application runs on your computer. There is no cloud account and the application adds no first-party telemetry. Diagnostic error reporting built into the official T-Invest SDK is disabled by default.
+Приложение работает на вашем компьютере, не требует облачной учётной записи и не собирает собственную телеметрию. Диагностическая отправка ошибок из официального SDK Т‑Инвестиций по умолчанию отключена.
 
-> **Privacy:** never commit `.env`, `portfolio.db`, backups or spreadsheet exports. They contain credentials or personal financial data. The repository includes a pre-publication check, but a `.gitignore` rule is not a substitute for checking what is actually staged.
+> **Конфиденциальность:** никогда не добавляйте в Git `.env`, `portfolio.db`, резервные копии и табличные экспорты. Они могут содержать токены и личные финансовые данные. В проекте есть автоматическая проверка перед публикацией, но она не заменяет ручную проверку подготовленных к коммиту файлов.
 
-## What is included
+## Возможности
 
-- current positions and weighted-average cost basis;
-- prices and supported operation history from T-Invest;
-- manual deposits with simple interest or monthly capitalization;
-- CBR rates and optional cash buy/sell rates scraped from one selected bank page;
-- portfolio snapshots and day/week/month comparisons;
-- leaders ranked by ruble impact on the portfolio;
-- value, allocation, return and price-history charts;
-- coupon, dividend, deposit-interest and maturity calendar;
-- Excel export plus restorable SQLite backup/restore commands.
+- текущие позиции и расчёт средней цены приобретения;
+- цены и история поддерживаемых операций из Т‑Инвестиций;
+- ручной учёт вкладов с простыми процентами или ежемесячной капитализацией;
+- официальные курсы ЦБ РФ и, при необходимости, наличные курсы выбранного банка;
+- снимки портфеля и сравнение изменений за день, неделю и месяц;
+- список лидеров по влиянию на стоимость портфеля в рублях;
+- графики стоимости, структуры, доходности и истории цен;
+- календарь купонов, дивидендов, процентов и окончания вкладов;
+- экспорт в Excel, резервное копирование и восстановление SQLite.
 
-The project is a personal dashboard, not a broker report or a tax calculator. Read [calculation rules and current limitations](docs/CALCULATIONS.md) before relying on the numbers.
+Это личный информационный дашборд, а не брокерский отчёт и не налоговый калькулятор. Перед использованием чисел ознакомьтесь с [правилами расчётов и ограничениями](docs/CALCULATIONS.md).
 
-## Quick start
+## Быстрый запуск
 
-Requirements: Python 3.11 or 3.12 and internet access for initial dependency installation. The frontend has no build step.
+Потребуются Python 3.11 или 3.12 и интернет для первоначальной установки зависимостей. Сборка фронтенда не нужна.
 
 ### Windows PowerShell
 
@@ -36,7 +36,11 @@ Copy-Item .env.example .env
 .\.venv\Scripts\python.exe -m app.cli serve
 ```
 
-Or, after cloning, run `powershell -ExecutionPolicy Bypass -File .\run.ps1`.
+Либо после клонирования запустите:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run.ps1
+```
 
 ### macOS / Linux
 
@@ -51,121 +55,121 @@ python -m app.cli init
 python -m app.cli serve
 ```
 
-Or run `chmod +x run.sh && ./run.sh`.
+Либо выполните `chmod +x run.sh && ./run.sh`.
 
-Open <http://127.0.0.1:8000>. Keep this address local: the application has no authentication and must not be exposed directly to the internet.
+Откройте <http://127.0.0.1:8000>. Не публикуйте этот адрес в интернете: в приложении нет авторизации, поэтому сервер должен оставаться доступным только локально.
 
-The first start creates an **empty** database. Synthetic demo data is optional and never loaded automatically:
+При первом запуске создаётся **пустая** база данных. Синтетические демонстрационные данные можно добавить отдельно:
 
 ```bash
 python -m app.cli demo --replace
 ```
 
-`--replace` is deliberately required because the command deletes the current local data.
+Параметр `--replace` обязателен, потому что эта команда удаляет текущие локальные данные.
 
-### Install with a coding agent
+### Установка с помощью ИИ-агента
 
-This repository includes [AGENTS.md](AGENTS.md), a setup and privacy contract for compatible coding agents. After cloning, you can give an agent the repository and say:
+В репозитории есть файл [AGENTS.md](AGENTS.md) — инструкция по безопасной установке для совместимых агентов. После клонирования можно передать агенту папку проекта и написать:
 
-> Read `AGENTS.md`, ask me the required setup questions, and install the application locally without exposing or replacing my private data.
+> Прочитай `AGENTS.md`, задай мне необходимые вопросы и установи приложение локально, не раскрывая и не заменяя мои личные данные.
 
-The agent is instructed to ask about the portfolio goal, tracking start date, T-Invest connection, currency source and holdings, bank deposits, update intervals, and private backups. Personal answers are stored only in ignored `.env`/SQLite files, not in tracked configuration examples.
+Агент должен уточнить цель портфеля, дату начала отслеживания, подключение Т‑Инвестиций, источник валютных курсов, имеющиеся валюты и вклады, интервалы обновлений и место для приватных резервных копий. Ответы сохраняются только в игнорируемых Git файлах `.env` и SQLite, а не в публичных примерах конфигурации.
 
-## Connect T-Invest
+## Подключение Т‑Инвестиций
 
-1. Choose the earliest tracking date in the dashboard or set `PORTFOLIO_TRACKING_START_DATE=YYYY-MM-DD` before importing. This prevents lifetime broker history from being pulled silently.
-2. Create a **read-only** T-Invest API token. Trading and transfer permissions are neither required nor recommended.
-3. Open `.env` and set `TINVEST_TOKEN=...`.
-4. If the token can see several accounts, set `TINVEST_ACCOUNT_ID`; otherwise the first returned account is used.
-5. Restart the application so the environment is reloaded.
-6. Click **Import T-Invest**. The application imports supported operations from the selected date, reconciles active quantities with the broker's current portfolio, refreshes prices and saves a snapshot.
+1. До импорта выберите начальную дату учёта в интерфейсе или задайте `PORTFOLIO_TRACKING_START_DATE=YYYY-MM-DD`. Это не позволит приложению без предупреждения импортировать всю историю счёта.
+2. Создайте API-токен Т‑Инвестиций **только для чтения**. Права на торговлю и вывод средств приложению не нужны.
+3. Откройте `.env` и укажите `TINVEST_TOKEN=...`.
+4. Если токен видит несколько счетов, задайте `TINVEST_ACCOUNT_ID`. Иначе будет выбран первый доступный счёт.
+5. Перезапустите приложение, чтобы перечитать `.env`.
+6. Нажмите **Импорт Т‑Инвест**. Приложение загрузит поддерживаемые операции с выбранной даты, сверит активные позиции с текущим портфелем брокера, обновит цены и создаст снимок.
 
-The token stays in `.env` and is never returned by `/api/status`. Synchronization is read-only from the broker's perspective. `TINVEST_SDK_ERROR_REPORTING=0` also disables the SDK's optional error-reporting channel; enabling it is an explicit opt-in.
+Токен остаётся в `.env` и не возвращается через `/api/status`. Синхронизация ничего не изменяет на стороне брокера. Параметр `TINVEST_SDK_ERROR_REPORTING=0` также отключает необязательную диагностическую отправку ошибок SDK.
 
-Current operation support covers buys, sells, coupons, dividends and bond repayments. Taxes, every fee type and every corporate action are not yet fully reconciled. T-Invest API data also does not replace a broker report when exact history matters.
+Сейчас поддерживаются покупки, продажи, купоны, дивиденды и погашения облигаций. Налоги, все виды комиссий и некоторые корпоративные действия пока учитываются не полностью. Для точной сверки истории используйте официальный брокерский отчёт.
 
-For an existing database, preview and safely apply a new boundary from the terminal:
+Чтобы изменить начальную дату для существующей базы, сначала выполните предварительную проверку, а затем примените изменение:
 
 ```bash
 python -m app.cli tracking-start --date 2026-04-01
 python -m app.cli tracking-start --date 2026-04-01 --apply
 ```
 
-The second command creates a SQLite backup, removes older imported broker operations and snapshots containing removed phantom positions, and updates `.env`. Manual deposits and currency entries are preserved. Restart a running server afterward.
+Вторая команда создаёт резервную копию SQLite, удаляет старые импортированные операции и загрязнённые снимки, после чего обновляет `.env`. Вклады и валюты, добавленные вручную, сохраняются. Работающий сервер после этого нужно перезапустить.
 
-## Add a bank deposit
+## Добавление банковского вклада
 
-Click **Add deposit** in the Positions block or in the first-run panel. Enter:
+Нажмите **Добавить вклад** в блоке позиций или на панели первоначальной настройки. Укажите:
 
-- a recognizable name;
-- principal;
-- opening and closing dates;
-- the annual rate as a normal percentage — enter `18`, not `0.18`;
-- interest paid at maturity without capitalization, or monthly capitalization.
+- понятное название;
+- сумму вклада;
+- даты открытия и окончания;
+- годовую ставку в обычных процентах: `18`, а не `0.18`;
+- выплату процентов в конце срока без капитализации либо ежемесячную капитализацию.
 
-The modal previews interest before saving. The instrument and its opening cash flow are created atomically, so a failed request does not leave a half-created deposit. Deposit terms are manual and are not imported from T-Invest.
+Перед сохранением форма показывает предварительный расчёт дохода. Условия вклада вводятся вручную и не импортируются из Т‑Инвестиций.
 
-An agent or terminal user can perform the same operation without constructing an API request:
+То же действие можно выполнить из терминала:
 
 ```bash
-python -m app.cli add-deposit --name "My deposit" --principal 250000 --open-date 2026-01-15 --close-date 2027-01-15 --rate 16 --mode simple
+python -m app.cli add-deposit --name "Мой вклад" --principal 250000 --open-date 2026-01-15 --close-date 2027-01-15 --rate 16 --mode simple
 ```
 
-## Currency rates
+## Курсы и учёт валюты
 
-`FX_RATE_SOURCE` controls how existing non-ruble currency positions are valued:
+Параметр `FX_RATE_SOURCE` определяет источник оценки валютных позиций:
 
-- `cbr` — official CBR rate; the stable default for a fresh clone;
-- `bank_buy` — what the configured bank pays when you sell it currency;
-- `bank_sell` — what the configured bank charges when you buy currency.
+- `cbr` — официальный курс ЦБ РФ, рекомендуемый вариант по умолчанию;
+- `bank_buy` — курс, по которому выбранный банк покупает валюту у клиента;
+- `bank_sell` — курс, по которому выбранный банк продаёт валюту клиенту.
 
-The bank modes parse `BANKIROS_URL`, currently a page for one bank, not a market-wide best rate. The parser recognizes USD, EUR, CNY, GBP, CHF, TRY and AED when those rows exist; CBR supports the currencies present in its daily feed. Only currency instruments already present in the local database are repriced.
+Банковские режимы разбирают страницу `BANKIROS_URL` конкретного банка, а не ищут лучший курс по рынку. Парсер распознаёт USD, EUR, CNY, GBP, CHF, TRY и AED, если они есть на странице. Источник ЦБ РФ поддерживает валюты из ежедневной официальной выгрузки. Обновляются только позиции, которые уже добавлены в локальную базу.
 
-Add an opening manual holding with its historical ruble cost, then fetch the current rate:
+Добавить валюту с её исторической стоимостью в рублях и затем получить текущий курс можно так:
 
 ```bash
 python -m app.cli add-currency --code USD --quantity 1000 --invested 90000 --date 2026-01-15
 python -m app.cli fetch-fx --source cbr
 ```
 
-The duplicate guard refuses to add the same currency twice accidentally. For a real additional purchase, pass `--append` and provide that purchase's own amount, cost, and date.
+Защита от дубликатов не позволит случайно добавить одну валюту дважды. Для реальной дополнительной покупки используйте `--append` и укажите количество, стоимость и дату именно этой покупки.
 
-No currency request runs automatically when the page opens. Use **Rates** or **Update all**, or configure `FX_EVERY_MIN`.
+При обычном открытии страницы запрос курса не выполняется. Используйте кнопку **Курсы**, **Обновить всё** или настройте интервал `FX_EVERY_MIN`.
 
-## Snapshots and comparisons
+## Снимки и сравнение периодов
 
-`SNAPSHOT_EVERY_MIN=60` creates snapshots while the application is running. Buttons that complete a full T-Invest import also save a snapshot.
+Параметр `SNAPSHOT_EVERY_MIN=60` создаёт снимки портфеля, пока приложение запущено. Полный импорт из Т‑Инвестиций также сохраняет снимок.
 
-The dashboard compares the current last snapshot with:
+Текущий последний снимок сравнивается с:
 
-- the last snapshot of the immediately preceding calendar day;
-- the last snapshot inside the preceding Monday–Sunday week;
-- the last snapshot inside the preceding calendar month.
+- последним снимком непосредственно предыдущего календарного дня;
+- последним доступным снимком предыдущей недели с понедельника по воскресенье;
+- последним доступным снимком предыдущего календарного месяца.
 
-If a required period has no snapshot, the UI shows “no reference snapshot” instead of fabricating a number. Full formulas are documented in [docs/CALCULATIONS.md](docs/CALCULATIONS.md).
+Если подходящего снимка нет, интерфейс сообщает об отсутствии данных для сравнения и не придумывает значение. Полные формулы описаны в [документации по расчётам](docs/CALCULATIONS.md).
 
-## Back up and restore your data
+## Резервное копирование и восстановление
 
-GitHub restores the **code**, not your private portfolio. T-Invest can rebuild part of the broker history, but it cannot recreate manual deposits, manual currency entries, local notes or historical snapshots.
+GitHub хранит **код**, но не личный портфель. Т‑Инвестиции могут восстановить часть брокерской истории, однако не вернут добавленные вручную вклады, валюты, локальные заметки и снимки.
 
-Create a consistent SQLite backup while the application is running or stopped:
+Создать согласованную копию SQLite можно как при работающем, так и при остановленном приложении:
 
 ```bash
 python -m app.cli backup
 python -m app.cli backup --output D:\PrivateBackups\portfolio
 ```
 
-Backups under the project `backups/` directory are ignored by Git. Copy them to a private encrypted disk or private cloud location.
+Каталог `backups/` внутри проекта игнорируется Git. Копируйте резервные файлы на приватный зашифрованный диск или в защищённое облачное хранилище.
 
-To restore, stop the web server first:
+Для восстановления сначала остановите веб-сервер:
 
 ```bash
 python -m app.cli restore D:\PrivateBackups\portfolio\portfolio-20260714-180000.db --yes
 ```
 
-The command validates the backup and creates a safety copy of the current database before replacing it.
+Команда проверит резервную копию и сохранит страховочную копию текущей базы перед заменой.
 
-## Tests and public-repository check
+## Проверка перед публикацией
 
 ```bash
 python -m pip install -r requirements-dev.txt
@@ -173,48 +177,51 @@ pytest -q
 python scripts/check_public.py
 ```
 
-The tests use a temporary `DB_PATH` and do not touch `portfolio.db`.
+Тесты используют временный `DB_PATH` и не открывают `portfolio.db` пользователя.
 
-Before the first public push:
+Перед каждым публичным коммитом:
 
-1. Run `python scripts/check_public.py`.
-2. Inspect `git status --short` and `git diff --cached` yourself.
-3. Confirm that `.env`, databases, backups, exports and local IDE/agent folders are absent.
-4. Search the complete Git history if this directory was ever committed elsewhere.
-5. Choose and add a `LICENSE`. No license is added automatically because that is the repository owner's legal choice.
+1. Запустите `python scripts/check_public.py`.
+2. Проверьте `git status --short` и `git diff --cached`.
+3. Убедитесь, что среди файлов нет `.env`, баз данных, резервных копий, экспортов и настроек редакторов или агентов.
+4. Если проект раньше публиковался в другом месте, проверьте всю историю Git.
 
-If a real token was ever committed, revoke it before rewriting history. See [SECURITY.md](SECURITY.md).
+Если настоящий токен когда-либо попал в коммит, немедленно отзовите его до очистки истории. Подробности находятся в [SECURITY.md](SECURITY.md).
 
-## Configuration
+## Конфигурация
 
-| Variable | Default | Purpose |
+| Переменная | Значение по умолчанию | Назначение |
 |---|---:|---|
-| `TINVEST_TOKEN` | empty | Read-only T-Invest token |
-| `TINVEST_ACCOUNT_ID` | first account | Select one account explicitly |
-| `TINVEST_SDK_ERROR_REPORTING` | `0` | Opt in to the official SDK's diagnostic error reports |
-| `PORTFOLIO_GOAL` | `1000000` | Progress target in rubles |
-| `PORTFOLIO_TRACKING_START_DATE` | empty | Earliest T-Invest import/history date (`YYYY-MM-DD`) |
-| `FX_RATE_SOURCE` | `cbr` | `cbr`, `bank_buy` or `bank_sell` |
-| `BANKIROS_URL` | Kamkombank page | Optional third-party cash-rate page |
-| `DB_PATH` | `portfolio.db` | SQLite path, relative to project root or absolute |
-| `SNAPSHOT_EVERY_MIN` | `60` | Background snapshot interval, `0` disables |
-| `FETCH_EVERY_MIN` | `0` | Background T-Invest price interval |
-| `FX_EVERY_MIN` | `0` | Background currency-rate interval |
+| `TINVEST_TOKEN` | пусто | Токен Т‑Инвестиций только для чтения |
+| `TINVEST_ACCOUNT_ID` | первый счёт | Явный выбор брокерского счёта |
+| `TINVEST_SDK_ERROR_REPORTING` | `0` | Отправка диагностических ошибок официального SDK |
+| `PORTFOLIO_GOAL` | `1000000` | Целевая стоимость портфеля в рублях |
+| `PORTFOLIO_TRACKING_START_DATE` | пусто | Самая ранняя дата импорта и истории (`YYYY-MM-DD`) |
+| `FX_RATE_SOURCE` | `cbr` | `cbr`, `bank_buy` или `bank_sell` |
+| `BANKIROS_URL` | страница Камкомбанка | Необязательная страница с наличными курсами банка |
+| `DB_PATH` | `portfolio.db` | Относительный или абсолютный путь к SQLite |
+| `SNAPSHOT_EVERY_MIN` | `60` | Интервал снимков; `0` отключает задачу |
+| `FETCH_EVERY_MIN` | `0` | Интервал обновления цен Т‑Инвестиций |
+| `FX_EVERY_MIN` | `0` | Интервал обновления курсов валют |
 
-## Project structure
+## Структура проекта
 
 ```text
 app/
-  main.py              FastAPI app and background jobs
-  config.py            environment configuration
-  db.py, models.py     SQLite / SQLAlchemy
-  routers/api.py       local REST API
-  services/            portfolio, snapshots, T-Invest, FX, calendar
-  dataio.py            verified backup and restore
-static/                 HTML, CSS and JavaScript (no build step)
-tests/                  isolated calculation and API tests
-scripts/check_public.py pre-publication privacy check
-AGENTS.md              installation and safety contract for coding agents
+  main.py              FastAPI-приложение и фоновые задачи
+  config.py            конфигурация из переменных окружения
+  db.py, models.py     SQLite и модели SQLAlchemy
+  routers/api.py       локальный REST API
+  services/            портфель, снимки, Т-Инвест, валюты и календарь
+  dataio.py            проверенное резервное копирование и восстановление
+static/                 HTML, CSS и JavaScript без этапа сборки
+tests/                  изолированные тесты расчётов и API
+scripts/check_public.py проверка безопасности перед публикацией
+AGENTS.md               инструкция по установке и безопасности для агентов
 ```
 
-The charts and calendar currently load ECharts, FullCalendar and fonts from public CDNs, so the dashboard is not fully offline even though portfolio data stays local.
+Графики и календарь загружают ECharts, FullCalendar и шрифты из публичных CDN. Поэтому интерфейс пока не работает полностью офлайн, хотя данные портфеля остаются локальными.
+
+## Лицензия
+
+Проект распространяется по лицензии [MIT](LICENSE).
