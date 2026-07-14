@@ -668,6 +668,7 @@ $("#modal-overlay").onclick = e => { if (e.target === $("#modal-overlay")) close
 $("#deposit-form").onsubmit = saveModal;
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && !$("#modal-overlay").classList.contains("hidden")) closeModal();
+  if (event.key === "Escape" && !$("#backup-overlay").classList.contains("hidden")) closeBackupModal();
 });
 ["#m-principal", "#m-open-date", "#m-close-date", "#m-rate"].forEach(id => {
   $(id).addEventListener("input", updateDepositPreview);
@@ -682,6 +683,166 @@ $("#m-interest-mode").onchange = () => {
 // ===== BUTTON HANDLERS =====
 let _appStatus = null;
 let _fxSourceInitialized = false;
+let _backupItems = [];
+
+function backupDate(value) {
+  if (!value) return "дата неизвестна";
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function backupSize(bytes) {
+  if (!Number.isFinite(bytes)) return "";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} КБ`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
+}
+
+function renderBackupConfig(status) {
+  const box = $("#backup-status");
+  const help = $("#backup-help");
+  const create = $("#backup-create");
+  box.classList.remove("ready", "error");
+  if (!status?.configured) {
+    box.classList.add("error");
+    box.querySelector("strong").textContent = "Репозиторий не настроен";
+    box.querySelector("small").textContent = "Укажите BACKUP_GIT_REPOSITORY в локальном .env.";
+    help.classList.remove("hidden");
+    create.disabled = true;
+    return false;
+  }
+  if (!status.git_available) {
+    box.classList.add("error");
+    box.querySelector("strong").textContent = "Git не найден";
+    box.querySelector("small").textContent = "Установите Git и перезапустите приложение.";
+    help.classList.remove("hidden");
+    create.disabled = true;
+    return false;
+  }
+  box.classList.add("ready");
+  box.querySelector("strong").textContent = "Приватный репозиторий подключён";
+  box.querySelector("small").textContent = status.latest_local
+    ? `Последняя локальная копия: ${backupDate(status.latest_local.created_at)}`
+    : "Копий на этом компьютере пока нет.";
+  help.classList.add("hidden");
+  create.disabled = false;
+  return true;
+}
+
+function renderBackupList(items) {
+  _backupItems = Array.isArray(items) ? items : [];
+  const select = $("#backup-select");
+  const restore = $("#backup-restore");
+  select.replaceChildren();
+  if (!_backupItems.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Бэкапов пока нет";
+    select.appendChild(option);
+    select.disabled = true;
+    restore.disabled = true;
+    $("#backup-meta").textContent = "Создайте первую резервную копию текущей базы.";
+    return;
+  }
+  _backupItems.forEach(item => {
+    const option = document.createElement("option");
+    option.value = item.name;
+    option.textContent = `${backupDate(item.created_at)} · ${backupSize(item.size_bytes)}`;
+    select.appendChild(option);
+  });
+  select.disabled = false;
+  restore.disabled = false;
+  updateBackupMeta();
+}
+
+function updateBackupMeta() {
+  const item = _backupItems.find(entry => entry.name === $("#backup-select").value);
+  $("#backup-meta").textContent = item
+    ? `${item.name} · ${backupSize(item.size_bytes)}. Текущая база будет сохранена локально.`
+    : "Перед восстановлением текущая база будет сохранена локально.";
+}
+
+async function loadBackupList() {
+  const select = $("#backup-select");
+  const restore = $("#backup-restore");
+  select.disabled = true;
+  restore.disabled = true;
+  select.replaceChildren(new Option("Обновляем список…", ""));
+  try {
+    const result = await api("/backups");
+    renderBackupList(result.items);
+  } catch (error) {
+    renderBackupList([]);
+    $("#backup-meta").textContent = error.message;
+    throw error;
+  }
+}
+
+async function openBackupModal() {
+  $("#backup-overlay").classList.remove("hidden");
+  if (!renderBackupConfig(_appStatus?.backups)) {
+    renderBackupList([]);
+    return;
+  }
+  try {
+    await loadBackupList();
+  } catch (error) {
+    toast("Не удалось получить список бэкапов: " + error.message, "err");
+  }
+}
+
+function closeBackupModal() {
+  $("#backup-overlay").classList.add("hidden");
+}
+
+async function createGitBackup() {
+  const accepted = window.confirm(
+    "Создать и отправить незашифрованную копию базы в настроенный приватный репозиторий?"
+  );
+  if (!accepted) return;
+  const button = $("#backup-create");
+  button.disabled = true;
+  button.textContent = "Сохраняем…";
+  toast("Создаём и отправляем резервную копию…");
+  try {
+    const result = await api("/backups", { method: "POST" });
+    toast(`Бэкап ${result.backup.name} отправлен ✓`);
+    _appStatus = await api("/status");
+    renderBackupConfig(_appStatus.backups);
+    await loadBackupList();
+  } catch (error) {
+    toast("Не удалось создать бэкап: " + error.message, "err");
+  } finally {
+    button.textContent = "Создать бэкап";
+    button.disabled = !(_appStatus?.backups?.configured && _appStatus?.backups?.git_available);
+  }
+}
+
+async function restoreGitBackup() {
+  const filename = $("#backup-select").value;
+  if (!filename) return;
+  const accepted = window.confirm(
+    `Восстановить ${filename}? Текущая база будет сохранена локально, затем полностью заменена.`
+  );
+  if (!accepted) return;
+  const button = $("#backup-restore");
+  button.disabled = true;
+  button.textContent = "Восстанавливаем…";
+  toast("Проверяем и восстанавливаем базу…");
+  try {
+    const result = await api("/backups/restore", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename, confirm: true }),
+    });
+    toast(`Восстановлено из ${result.restored.name} ✓`);
+    setTimeout(() => window.location.reload(), 1400);
+  } catch (error) {
+    toast("Не удалось восстановить базу: " + error.message, "err");
+    button.disabled = false;
+    button.textContent = "Восстановить";
+  }
+}
 
 async function act(path, msg) {
   toast("…");
@@ -807,6 +968,13 @@ $("#btn-prices").onclick = async () => {
 $("#btn-sync").onclick = syncTinvest;
 $("#btn-tracking-start").onclick = chooseTrackingStart;
 $("#btn-fx").onclick = applyFxSource;
+$("#btn-backups").onclick = openBackupModal;
+$("#backup-close").onclick = closeBackupModal;
+$("#backup-cancel").onclick = closeBackupModal;
+$("#backup-overlay").onclick = event => { if (event.target === $("#backup-overlay")) closeBackupModal(); };
+$("#backup-create").onclick = createGitBackup;
+$("#backup-restore").onclick = restoreGitBackup;
+$("#backup-select").onchange = updateBackupMeta;
 $("#fx-source").onchange = applyFxSource;
 $("#onboarding-sync").onclick = syncTinvest;
 $("#onboarding-tracking").onclick = chooseTrackingStart;

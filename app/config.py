@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import date
 from pathlib import Path
 from dotenv import load_dotenv
@@ -62,3 +63,18 @@ SNAPSHOT_EVERY_MIN = _non_negative_int("SNAPSHOT_EVERY_MIN", 60)
 FETCH_EVERY_MIN = _non_negative_int("FETCH_EVERY_MIN", 0)
 # Автообновление курсов валют каждые N минут (0 = выключить)
 FX_EVERY_MIN = _non_negative_int("FX_EVERY_MIN", 0)
+
+# Optional private Git repository for unencrypted SQLite backups.
+# Authentication is handled by the system Git credential manager, never .env.
+BACKUP_GIT_REPOSITORY = os.getenv("BACKUP_GIT_REPOSITORY", "").strip()
+BACKUP_GIT_BRANCH = os.getenv("BACKUP_GIT_BRANCH", "main").strip() or "main"
+if (
+    BACKUP_GIT_BRANCH.startswith("-")
+    or ".." in BACKUP_GIT_BRANCH
+    or not re.fullmatch(r"[A-Za-z0-9._/-]+", BACKUP_GIT_BRANCH)
+):
+    raise ValueError("BACKUP_GIT_BRANCH contains unsupported characters")
+
+# Deliberately fixed under an ignored directory so a database can never be
+# staged in the public source repository because of a bad environment value.
+BACKUP_GIT_DIRECTORY = (BASE_DIR / "backups" / "git-vault").resolve()

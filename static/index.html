@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
-<link rel="stylesheet" href="/static/styles.css?v=20260714-14">
+<link rel="stylesheet" href="/static/styles.css?v=20260714-15">
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 </head>
@@ -33,6 +33,7 @@
     <button id="btn-sync" class="ghost" title="Импортировать операции и цены из T-Invest">⇄ Импорт T-Invest</button>
     <button id="btn-snap" class="ghost" title="Зафиксировать снимок">⎙ Снимок</button>
     <button id="btn-excel" class="ghost" title="Скачать Excel">⬇ Excel</button>
+    <button id="btn-backups" class="ghost" title="Создать или восстановить резервную копию">↻ Бэкапы</button>
     <button id="btn-reload" class="primary">Обновить</button>
   </div>
 </header>
@@ -226,7 +227,41 @@
     </form>
   </div>
 </div>
+
+<!-- Модалка: Git-бэкапы -->
+<div id="backup-overlay" class="modal-overlay hidden">
+  <div class="modal backup-modal" role="dialog" aria-modal="true" aria-labelledby="backup-modal-title">
+    <div class="modal-head">
+      <div><h3 id="backup-modal-title">Резервные копии</h3><p>Приватный Git-репозиторий</p></div>
+      <button id="backup-close" class="ghost" type="button" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="backup-body">
+      <div id="backup-status" class="backup-status" aria-live="polite">
+        <span class="status-dot"></span>
+        <div><strong>Проверяем настройку…</strong><small>Репозиторий и Git должны быть доступны приложению.</small></div>
+      </div>
+      <div class="backup-warning">
+        <span>!</span>
+        <p><strong>Копии не шифруются.</strong> В них находится полный портфель. Репозиторий должен всегда оставаться приватным, а доступ к нему — только у доверенных пользователей.</p>
+      </div>
+      <div class="backup-create-card">
+        <div><strong>Сохранить текущее состояние</strong><small>Приложение проверит SQLite, создаст небольшой коммит и выполнит push.</small></div>
+        <button id="backup-create" class="primary" type="button">Создать бэкап</button>
+      </div>
+      <div class="backup-restore-card">
+        <label for="backup-select">Восстановить сохранённую версию</label>
+        <div class="backup-select-row">
+          <select id="backup-select" disabled><option value="">Загрузка списка…</option></select>
+          <button id="backup-restore" class="danger" type="button" disabled>Восстановить</button>
+        </div>
+        <small id="backup-meta">Перед восстановлением текущая база будет сохранена локально.</small>
+      </div>
+      <p id="backup-help" class="backup-help hidden">Добавьте <code>BACKUP_GIT_REPOSITORY=https://github.com/USER/PRIVATE-REPO.git</code> в <code>.env</code> и перезапустите приложение.</p>
+    </div>
+    <div class="modal-foot"><button id="backup-cancel" class="ghost" type="button">Закрыть</button></div>
+  </div>
+</div>
 <div id="toast"></div>
-<script src="/static/app.js?v=20260714-14"></script>
+<script src="/static/app.js?v=20260714-15"></script>
 </body>
 </html>

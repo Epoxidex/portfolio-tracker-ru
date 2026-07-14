@@ -13,6 +13,8 @@ os.environ["SNAPSHOT_EVERY_MIN"] = "0"
 os.environ["FETCH_EVERY_MIN"] = "0"
 os.environ["FX_EVERY_MIN"] = "0"
 os.environ["PORTFOLIO_TRACKING_START_DATE"] = ""
+os.environ["BACKUP_GIT_REPOSITORY"] = ""
+os.environ["BACKUP_GIT_BRANCH"] = "main"
 
 from app.db import Base, SessionLocal, engine  # noqa: E402
 

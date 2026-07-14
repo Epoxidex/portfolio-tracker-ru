@@ -160,6 +160,12 @@ button.ghost, .btn-link.ghost {
   background: rgba(23, 31, 43, .82);
 }
 button.ghost:hover { border-color: var(--border-strong); background: var(--panel3); }
+button.danger {
+  color: #ffdbe1;
+  border-color: rgba(255,116,136,.28);
+  background: rgba(255,116,136,.1);
+}
+button.danger:hover { border-color: rgba(255,116,136,.48); background: rgba(255,116,136,.16); }
 button.active {
   color: #19160d;
   border-color: rgba(255, 222, 135, .35);
@@ -866,6 +872,7 @@ tr.group-row > td {
 }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 17px 20px; border-bottom: 1px solid var(--border); }
 .modal-head h3 { font-size: 15px; font-weight: 700; }
+.modal-head p { margin-top: 2px; color: var(--mut); font-size: 9px; }
 .modal form { min-width: 0; }
 .modal-body {
   display: grid;
@@ -914,6 +921,92 @@ tr.group-row > td {
 .deposit-preview span { color: var(--mut); font-size: 9px; }
 .deposit-preview strong { color: var(--teal); font-size: 18px; font-variant-numeric: tabular-nums; }
 .deposit-preview small { grid-column: 1 / -1; color: var(--mut-soft); font-size: 8px; }
+
+/* ===== BACKUPS ===== */
+.backup-modal { width: 590px; }
+.backup-body { display: flex; flex-direction: column; gap: 12px; padding: 20px; }
+.backup-status,
+.backup-create-card,
+.backup-restore-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(23,31,43,.62);
+}
+.backup-status {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr);
+  align-items: center;
+  gap: 11px;
+  padding: 13px 14px;
+}
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--mut-soft);
+  box-shadow: 0 0 0 4px rgba(113,128,149,.1);
+}
+.backup-status.ready .status-dot { background: var(--green); box-shadow: 0 0 0 4px rgba(78,219,136,.1); }
+.backup-status.error .status-dot { background: var(--red); box-shadow: 0 0 0 4px rgba(255,116,136,.1); }
+.backup-status strong,
+.backup-create-card strong { display: block; color: #e4eaf1; font-size: 11px; }
+.backup-status small,
+.backup-create-card small { display: block; margin-top: 3px; color: var(--mut); font-size: 9px; line-height: 1.4; }
+.backup-warning {
+  display: grid;
+  grid-template-columns: 24px minmax(0,1fr);
+  gap: 10px;
+  padding: 12px 13px;
+  color: #c8b995;
+  font-size: 9px;
+  line-height: 1.5;
+  border: 1px solid rgba(244,196,87,.16);
+  border-radius: 11px;
+  background: rgba(244,196,87,.055);
+}
+.backup-warning > span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  color: #19160d;
+  font-weight: 800;
+  border-radius: 50%;
+  background: var(--amber);
+}
+.backup-warning strong { color: var(--amber-bright); }
+.backup-create-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+}
+.backup-restore-card { padding: 14px; }
+.backup-restore-card > label { display: block; margin-bottom: 7px; color: #d8e0e9; font-size: 10px; font-weight: 650; }
+.backup-select-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; }
+.backup-select-row select {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 30px 0 10px;
+  color: #c5cfda;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  outline: none;
+  background: var(--panel2);
+}
+.backup-select-row select:focus { border-color: rgba(244,196,87,.4); }
+.backup-restore-card > small { display: block; margin-top: 8px; color: var(--mut-soft); font-size: 8px; }
+.backup-help {
+  padding: 11px 13px;
+  color: var(--mut);
+  font-size: 9px;
+  line-height: 1.5;
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+}
+.backup-help code { color: var(--amber); }
 
 /* ===== TOAST ===== */
 #toast {
@@ -1049,6 +1142,10 @@ tr.group-row > td {
   .empty-row td:first-child { position: static; background: rgba(12,18,25,.3); }
   .modal-body { grid-template-columns: 1fr; }
   .form-wide, .form-intro { grid-column: 1; }
+  .backup-create-card { align-items: stretch; flex-direction: column; }
+  .backup-create-card button { width: 100%; }
+  .backup-select-row { grid-template-columns: 1fr; }
+  .backup-select-row button { width: 100%; }
 }
 
 @media (max-width: 430px) {

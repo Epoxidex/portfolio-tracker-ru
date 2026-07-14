@@ -10,40 +10,44 @@ from . import config
 from .services import snapshots
 from .services.tinvest import fetch_prices
 from .services.banki import fetch_fx
+from .dataio import DATABASE_MAINTENANCE_LOCK
 
 BASE = Path(__file__).resolve().parent.parent
 scheduler = BackgroundScheduler(timezone="Europe/Moscow")
 
 
 def _job_snapshot():
-    db = SessionLocal()
-    try:
-        snapshots.take_snapshot(db, source="auto")
-    except Exception as e:
-        print("snapshot job error:", e)
-    finally:
-        db.close()
+    with DATABASE_MAINTENANCE_LOCK:
+        db = SessionLocal()
+        try:
+            snapshots.take_snapshot(db, source="auto")
+        except Exception as e:
+            print("snapshot job error:", e)
+        finally:
+            db.close()
 
 
 def _job_fetch():
-    db = SessionLocal()
-    try:
-        if config.TINVEST_TOKEN:
-            fetch_prices(db)
-    except Exception as e:
-        print("fetch-prices job error:", e)
-    finally:
-        db.close()
+    with DATABASE_MAINTENANCE_LOCK:
+        db = SessionLocal()
+        try:
+            if config.TINVEST_TOKEN:
+                fetch_prices(db)
+        except Exception as e:
+            print("fetch-prices job error:", e)
+        finally:
+            db.close()
 
 
 def _job_fx():
-    db = SessionLocal()
-    try:
-        fetch_fx(db)
-    except Exception as e:
-        print("fetch-fx job error:", e)
-    finally:
-        db.close()
+    with DATABASE_MAINTENANCE_LOCK:
+        db = SessionLocal()
+        try:
+            fetch_fx(db)
+        except Exception as e:
+            print("fetch-fx job error:", e)
+        finally:
+            db.close()
 
 
 def _startup():

@@ -6,6 +6,7 @@ from ..db import get_db
 from ..models import Instrument, Transaction, PriceHistory, Snapshot
 from ..schemas import (
     TxIn, InstrumentIn, PriceIn, DepositIn, CurrencyHoldingIn, TrackingStartIn,
+    BackupRestoreIn,
 )
 from ..dataio import backup_database
 from ..services import portfolio, calendar as cal, snapshots
@@ -14,6 +15,13 @@ from ..services.tracking import apply_tracking_cleanup, update_env_setting
 from ..services.tinvest import fetch_prices
 from ..services.banki import fetch_fx
 from ..services.operations import sync_operations
+from ..services.git_backup import (
+    GitBackupError,
+    backup_status,
+    create_repository_backup,
+    list_repository_backups,
+    restore_repository_backup,
+)
 
 router = APIRouter(prefix="/api")
 
@@ -46,12 +54,38 @@ def get_status(db: Session = Depends(get_db)):
             config.PORTFOLIO_TRACKING_START_DATE.isoformat()
             if config.PORTFOLIO_TRACKING_START_DATE else None
         ),
+        "backups": backup_status(),
         "data": {
             "instruments": db.query(Instrument).count(),
             "transactions": db.query(Transaction).count(),
             "snapshots": db.query(Snapshot).count(),
         },
     }
+
+
+@router.get("/backups")
+def get_backups():
+    try:
+        return {"ok": True, "items": list_repository_backups()}
+    except GitBackupError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/backups")
+def create_backup():
+    try:
+        return {"ok": True, "backup": create_repository_backup()}
+    except GitBackupError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/backups/restore")
+def restore_backup(payload: BackupRestoreIn):
+    try:
+        result = restore_repository_backup(payload.filename)
+        return {"ok": True, **result}
+    except GitBackupError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.post("/settings/tracking-start")

@@ -41,8 +41,10 @@ one concise, grouped set of questions and allow unknown items to be skipped:
   percent, and either simple interest or monthly capitalization.
 - Background intervals for snapshots, T-Invest prices, and currency rates.
   Explain that `0` disables a job and jobs run only while the app is open.
-- A private backup directory outside the repository and whether an existing
-  backup should be restored.
+- A private backup directory outside the repository, whether to connect a
+  separate private Git repository for unencrypted UI backups, and whether an
+  existing backup should be restored. Explain that every collaborator on that
+  private repository can read the complete portfolio database.
 
 The current accounting base currency is RUB. If the user needs another base
 currency, say that this is a code change and clarify the scope before proceeding.
@@ -75,6 +77,9 @@ build step. On Windows, use `.venv\Scripts\python.exe`; on macOS/Linux, use
    `python -m app.cli sync-ops --days 3650` only after the user confirms the
    account. Then refresh prices. T-Invest access must remain read-only.
 7. Refresh currency rates, take an initial snapshot, and create a private backup.
+   If `BACKUP_GIT_REPOSITORY` is selected, keep credentials in the system Git
+   credential manager, verify the repository is private, and never put a token
+   in the URL or `.env`.
 8. Install `requirements-dev.txt`, run the verification commands below, start
    the app, and tell the user where the private data and backups live.
 

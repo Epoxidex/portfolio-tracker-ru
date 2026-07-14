@@ -28,7 +28,9 @@ GitHub documents the history-rewrite process in its guide to removing sensitive 
 
 ## Backups
 
-Public Git hosting is intentionally **not** a backup for portfolio data. Keep database backups in a private, preferably encrypted location and occasionally test restoring one. Commands are documented in the README.
+The optional UI backup feature stores complete, unencrypted SQLite files in a separate Git repository. That repository must remain private, must never be used as the public source-code remote, and must not contain `.env` or tokens. Anyone with repository access can read the financial data, and old backups remain in Git history.
+
+Git credentials are handled by the system credential manager. Do not embed a username, password or token in `BACKUP_GIT_REPOSITORY`. Keep another independent backup and occasionally test the restore workflow. Setup and recovery steps are documented in the README.
 
 ## Reporting a vulnerability
 

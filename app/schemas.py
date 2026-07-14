@@ -76,3 +76,12 @@ class CurrencyHoldingIn(BaseModel):
 class TrackingStartIn(BaseModel):
     start_date: date
     confirm: Literal[True]
+
+
+class BackupRestoreIn(BaseModel):
+    filename: str = Field(
+        min_length=1,
+        max_length=80,
+        pattern=r"^portfolio-\d{8}-\d{6}(?:-\d+)?\.db$",
+    )
+    confirm: Literal[True]
