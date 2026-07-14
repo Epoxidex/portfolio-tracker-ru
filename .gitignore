@@ -1,0 +1,39 @@
+# Secrets and machine-local configuration
+.env
+.env.*
+!.env.example
+
+# Portfolio data, exports and backups (contain financial information)
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+backups/
+exports/
+*.xlsx
+*.xls
+*.csv
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Logs, editors and local agent settings
+*.log
+.idea/
+.vscode/
+.claude/
+.agents/
+.codex/
+.DS_Store
+Thumbs.db

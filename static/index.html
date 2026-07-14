@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Портфель — трекер</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/static/styles.css?v=20260714-14">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="logo">◆</span>
+    <div>
+      <h1>Портфель</h1>
+      <div class="sub" id="asof">—</div>
+    </div>
+  </div>
+  <div class="actions">
+    <button id="btn-tracking-start" class="ghost" title="Изменить дату начала учёта">Учёт с…</button>
+    <select id="fx-source" title="Источник курса валюты">
+      <option value="bank_buy">Банк покупает валюту</option>
+      <option value="bank_sell">Банк продаёт</option>
+      <option value="cbr">ЦБ РФ</option>
+    </select>
+    <button id="btn-fx" class="ghost" title="Обновить курсы валют">⟳ Курсы</button>
+    <button id="btn-prices" class="ghost" title="Обновить только цены из T-Invest">⟳ Только цены</button>
+    <button id="btn-sync" class="ghost" title="Импортировать операции и цены из T-Invest">⇄ Импорт T-Invest</button>
+    <button id="btn-snap" class="ghost" title="Зафиксировать снимок">⎙ Снимок</button>
+    <button id="btn-excel" class="ghost" title="Скачать Excel">⬇ Excel</button>
+    <button id="btn-reload" class="primary">Обновить</button>
+  </div>
+</header>
+
+<main>
+  <section id="onboarding" class="onboarding hidden" aria-live="polite">
+    <div class="onboarding-copy">
+      <span class="eyebrow">Первый запуск</span>
+      <h2 id="onboarding-title">Подключите свои данные</h2>
+      <p id="onboarding-text">База пока пуста. Данные хранятся только на этом компьютере.</p>
+    </div>
+    <ol class="onboarding-steps">
+      <li><span>1</span><div><strong>Выберите начало учёта</strong><small>Старые сделки до этой даты не попадут в портфель.</small></div></li>
+      <li><span>2</span><div><strong>Настройте доступ</strong><small>Скопируйте <code>.env.example</code> в <code>.env</code> и вставьте read-only токен.</small></div></li>
+      <li><span>3</span><div><strong>Импортируйте T-Invest</strong><small>Загрузятся поддерживаемые операции, текущие позиции и цены.</small></div></li>
+      <li><span>4</span><div><strong>Добавьте вклады</strong><small>Они не приходят из брокера и ведутся вручную.</small></div></li>
+    </ol>
+    <div class="onboarding-actions">
+      <button id="onboarding-tracking" class="ghost">Выбрать дату</button>
+      <button id="onboarding-sync" class="primary">Импортировать T-Invest</button>
+      <button id="onboarding-deposit" class="ghost">Добавить вклад</button>
+    </div>
+  </section>
+
+  <!-- KPI карточки -->
+  <section class="kpis" id="kpis"></section>
+
+  <!-- Игровая панель: прогресс + стрик + дельты по периодам -->
+  <section class="gamebar" id="gamebar">
+    <div class="progress-card">
+      <div class="progress-label">
+        <span id="goal-label">Цель: 1 000 000 ₽</span>
+        <span id="progress-pct" class="progress-pct-val"></span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-sub" id="progress-sub"></div>
+    </div>
+    <div class="streak-card">
+      <div class="hint">Стрик 🔥</div>
+      <div class="streak-val" id="streak-val">—</div>
+      <div class="hint" id="streak-sub">дней в плюсе</div>
+    </div>
+    <div class="delta-card">
+      <div class="delta-item">
+        <div class="hint">за день</div>
+        <div class="delta-val" id="delta-today">—</div>
+        <div class="delta-pct" id="delta-today-pct"></div>
+      </div>
+      <div class="delta-item">
+        <div class="hint">за неделю</div>
+        <div class="delta-val" id="delta-week">—</div>
+        <div class="delta-pct" id="delta-week-pct"></div>
+      </div>
+      <div class="delta-item">
+        <div class="hint">за месяц</div>
+        <div class="delta-val" id="delta-month">—</div>
+        <div class="delta-pct" id="delta-month-pct"></div>
+      </div>
+      <div class="delta-item">
+        <div class="hint">с нач. года</div>
+        <div class="delta-val" id="delta-ytd">—</div>
+        <div class="delta-pct" id="delta-ytd-pct"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Лидеры изменения портфеля -->
+  <section class="card leaders-card">
+    <div class="card-head">
+      <h2>Лидеры изменения</h2>
+      <span class="hint" id="leaders-range">вклад инструментов в изменение стоимости</span>
+      <span class="period-switch">
+        <button class="leaders-btn ghost active" data-period="day">День</button>
+        <button class="leaders-btn ghost" data-period="week">Неделя</button>
+        <button class="leaders-btn ghost" data-period="month">Месяц</button>
+      </span>
+    </div>
+    <div id="leaders-list" class="leaders-list"></div>
+  </section>
+
+  <!-- Графики: стоимость + структура -->
+  <section class="grid-2">
+    <div class="card">
+      <div class="card-head">
+        <h2>Стоимость портфеля</h2><span class="hint">по снимкам</span>
+        <span class="period-switch">
+          <button class="value-period-btn ghost active" data-period="day">Дни</button>
+          <button class="value-period-btn ghost" data-period="week">Недели</button>
+          <button class="value-period-btn ghost" data-period="month">Месяцы</button>
+        </span>
+      </div>
+      <div id="chart-value" class="chart"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Структура</h2><span class="hint" id="alloc-total"></span></div>
+      <div id="chart-alloc" class="chart"></div>
+    </div>
+  </section>
+
+  <!-- Позиции -->
+  <section class="card">
+    <div class="card-head"><h2>Позиции</h2>
+      <span class="hint">реальный P&amp;L с купонами и НКД</span>
+      <button id="btn-add" class="ghost card-action">+ Добавить вклад</button>
+    </div>
+    <div class="table-wrap"><table id="positions"></table></div>
+  </section>
+
+  <!-- Доходность по периодам -->
+  <section class="card">
+    <div class="card-head">
+      <h2>Доходность</h2>
+      <span class="hint">изменение P&amp;L за период, % от вложенного капитала</span>
+      <span class="period-switch">
+        <button class="returns-btn ghost active" data-period="daily">День</button>
+        <button class="returns-btn ghost" data-period="monthly">Месяц</button>
+        <button class="returns-btn ghost" data-period="yearly">Год</button>
+      </span>
+    </div>
+    <div id="chart-returns" class="chart"></div>
+  </section>
+
+  <!-- Календарь выплат (FullCalendar) -->
+  <section class="card calendar-card">
+    <div class="card-head">
+      <h2>Календарь выплат</h2>
+      <span class="hint" id="cal-sum"></span>
+      <span class="calendar-legend" aria-label="Типы выплат">
+        <span class="coupon">Купоны</span>
+        <span class="interest">Проценты</span>
+        <span class="dividend">Дивиденды</span>
+        <span class="maturity">Погашения</span>
+      </span>
+    </div>
+    <div id="fc-calendar"></div>
+  </section>
+
+  <!-- Список выплат + Пассивный доход -->
+  <section class="grid-2 income-grid">
+    <div class="card">
+      <div class="card-head"><h2>Список выплат</h2><span class="hint">ближайшие</span></div>
+      <div id="calendar" class="calendar"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Пассивный доход</h2><span class="hint">run-rate</span></div>
+      <div class="live-counter-wrap">
+        <div class="hint">заработано сегодня</div>
+        <div class="live-counter" id="live-counter">0,000 ₽</div>
+      </div>
+      <div id="passive" class="passive"></div>
+    </div>
+  </section>
+
+  <!-- История цен -->
+  <section class="card">
+    <div class="card-head">
+      <h2>История цен</h2>
+      <span class="hint price-controls">
+        <select id="price-hist-inst"><option value="">выберите инструмент…</option></select>
+        <select id="price-hist-days">
+          <option value="30">30 дней</option>
+          <option value="90" selected>90 дней</option>
+          <option value="365">год</option>
+        </select>
+      </span>
+    </div>
+    <div id="chart-prices" class="chart"></div>
+  </section>
+
+</main>
+
+<!-- Модалка: добавить вклад -->
+<div id="modal-overlay" class="modal-overlay hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="deposit-modal-title">
+    <div class="modal-head"><h3 id="deposit-modal-title">Добавить вклад</h3><button id="modal-close" class="ghost" type="button" aria-label="Закрыть">✕</button></div>
+    <form id="deposit-form">
+      <div class="modal-body">
+        <p class="form-intro">Вклад считается отдельно от T-Invest. Укажите условия договора — приложение покажет начисленный доход и добавит выплаты в календарь.</p>
+        <div class="form-row form-wide"><label for="m-name">Название вклада</label><input id="m-name" maxlength="200" required placeholder="Например, вклад на 6 месяцев"></div>
+        <div class="form-row form-wide"><label for="m-principal">Сумма вклада, ₽</label><input id="m-principal" type="number" min="0.01" step="0.01" inputmode="decimal" required placeholder="200 000"></div>
+        <div class="form-row"><label for="m-open-date">Дата открытия</label><input id="m-open-date" type="date" required></div>
+        <div class="form-row"><label for="m-close-date">Дата закрытия</label><input id="m-close-date" type="date" required></div>
+        <div class="form-row"><label for="m-rate">Ставка, % годовых</label><input id="m-rate" type="number" min="0" max="100" step="0.01" inputmode="decimal" required placeholder="18"><small>Введите <strong>18</strong>, а не 0,18.</small></div>
+        <div class="form-row"><label for="m-interest-mode">Начисление процентов</label><select id="m-interest-mode"><option value="simple">В конце срока, без капитализации</option><option value="monthly_capitalization">Ежемесячная капитализация</option></select><small id="m-mode-help">Простые проценты начисляются по дням.</small></div>
+        <div id="deposit-preview" class="deposit-preview form-wide">Заполните сумму, даты и ставку — здесь появится расчёт.</div>
+      </div>
+      <div class="modal-foot">
+        <button id="modal-save" class="primary" type="submit">Добавить вклад</button>
+        <button id="modal-cancel" class="ghost" type="button">Отмена</button>
+      </div>
+    </form>
+  </div>
+</div>
+<div id="toast"></div>
+<script src="/static/app.js?v=20260714-14"></script>
+</body>
+</html>

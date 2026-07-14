@@ -1,0 +1,13 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+SQLAlchemy>=2.0
+APScheduler>=3.10
+requests>=2.31
+beautifulsoup4>=4.12
+lxml>=5.0
+python-dateutil>=2.9
+openpyxl>=3.1
+
+# Current T-Invest Python SDK is distributed from T-Bank's package registry.
+--extra-index-url https://opensource.tbank.ru/api/v4/projects/238/packages/pypi/simple
+t-tech-investments>=1.49.2,<2
