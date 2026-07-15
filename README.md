@@ -23,7 +23,46 @@
 
 ## Быстрый запуск
 
-Потребуются Python 3.11 или 3.12 и интернет для первоначальной установки зависимостей. Для стабильного интерфейса сборка фронтенда пока не нужна.
+Самый переносимый вариант — Docker Desktop или Docker Engine с Compose. Образ
+сам собирает Python-приложение и React-preview; устанавливать Python и Node.js на
+компьютер не нужно.
+
+### Docker
+
+```bash
+git clone https://github.com/Epoxidex/portfolio-tracker-ru.git
+cd portfolio-tracker-ru
+cp .env.example .env
+docker compose up --build -d
+```
+
+В Windows PowerShell вместо `cp` используйте `Copy-Item .env.example .env`.
+Откройте <http://127.0.0.1:8000>; React-preview находится на
+<http://127.0.0.1:8000/react-preview/>. Статус и логи:
+
+```bash
+docker compose ps
+docker compose logs -f portfolio
+```
+
+База, локальные резервные копии и служебные Git-данные хранятся в именованном
+томе `portfolio-tracker-data`. Обычные перезапуск и `docker compose down` его
+сохраняют. **Не запускайте `docker compose down -v`**, если не хотите удалить
+весь локальный портфель. Чтобы использовать другой порт, задайте, например,
+`PORTFOLIO_PORT=8090` в `.env` и снова выполните `docker compose up -d`.
+
+По умолчанию порт публикуется только на `127.0.0.1`. Не меняйте
+`PORTFOLIO_BIND_ADDRESS` на `0.0.0.0`: в приложении пока нет авторизации.
+
+GitHub содержит только код. После клонирования на новой машине без приватной
+SQLite-копии будет создана пустая база. Сценарий переноса и восстановления
+описан в разделе [«Резервное копирование и восстановление»](#резервное-копирование-и-восстановление).
+
+### Запуск без Docker
+
+Потребуются Python 3.11 или 3.12 и интернет для первоначальной установки
+зависимостей. `run.ps1` и `run.sh` сохранены как простой способ запуска без
+Docker.
 
 ### Windows PowerShell
 
@@ -228,6 +267,36 @@ python -m app.cli restore D:\PrivateBackups\portfolio\portfolio-20260714-180000.
 
 Команда проверит резервную копию и сохранит страховочную копию текущей базы перед заменой.
 
+### Резервная копия и восстановление в Docker
+
+Создать согласованную копию внутри постоянного тома и затем выгрузить её на
+другой диск или в защищённое облачное хранилище:
+
+```bash
+docker compose exec portfolio python -m app.cli backup
+docker compose cp portfolio:/data/backups/portfolio-YYYYMMDD-HHMMSS.db ./portfolio-backup.db
+```
+
+Первая команда напечатает точное имя файла. Копия только внутри Docker-тома не
+защищает от поломки или потери компьютера — хотя бы одна актуальная копия должна
+находиться на другом устройстве или в отдельном приватном хранилище.
+
+На новой машине сначала клонируйте код и запустите контейнер, затем скопируйте
+приватную базу в том и восстановите её при остановленном сервисе:
+
+```bash
+docker compose up --build -d
+docker compose cp ./portfolio-backup.db portfolio:/data/incoming.db
+docker compose stop portfolio
+docker compose run --rm portfolio python -m app.cli restore /data/incoming.db --yes
+docker compose up -d
+```
+
+Восстановление проверяет SQLite и сохраняет прежнюю базу как
+`/data/backups/before-restore-*.db`. Настройка UI-бэкапов в приватный Git из
+контейнера требует отдельной авторизации Git/SSH внутри контейнера; не помещайте
+GitHub-токен в `.env` или URL репозитория.
+
 ## Проверка перед публикацией
 
 ```bash
@@ -262,6 +331,12 @@ read-only T-Invest. Write-tools требуют явного `confirm=true`, ун
 .\.venv\Scripts\python.exe .\mcp_server.py
 ```
 
+Если приложение работает в Docker, MCP использует ту же базу в постоянном томе:
+
+```bash
+docker compose exec -T portfolio python /app/mcp_server.py
+```
+
 Настройка Codex, список всех tools/resources и меры приватности описаны в
 [`docs/MCP.md`](docs/MCP.md).
 
@@ -283,6 +358,9 @@ read-only T-Invest. Write-tools требуют явного `confirm=true`, ун
 | `FX_EVERY_MIN` | `0` | Интервал обновления курсов валют |
 | `BACKUP_GIT_REPOSITORY` | пусто | URL отдельного приватного репозитория с SQLite-копиями |
 | `BACKUP_GIT_BRANCH` | `main` | Ветка репозитория резервных копий |
+| `PORTFOLIO_PORT` | `8000` | Порт на компьютере для Docker Compose |
+| `PORTFOLIO_BIND_ADDRESS` | `127.0.0.1` | Адрес публикации Docker-порта; не открывайте без авторизации |
+| `PORTFOLIO_DATA_VOLUME` | `portfolio-tracker-data` | Имя постоянного Docker-тома с приватной базой |
 
 ## Структура проекта
 
@@ -295,6 +373,10 @@ app/
   services/            портфель, снимки, Т-Инвест, валюты, календарь и Git-бэкапы
   dataio.py            проверенное резервное копирование и восстановление
 static/                 HTML, CSS и JavaScript без этапа сборки
+frontend/               React-preview и его исходный код
+mcp_server.py           локальный MCP-сервер чтения и контролируемой записи
+Dockerfile              multi-stage сборка React и Python runtime
+compose.yaml            безопасный локальный запуск и постоянный том данных
 tests/                  изолированные тесты расчётов и API
 scripts/check_public.py проверка безопасности перед публикацией
 AGENTS.md               инструкция по установке и безопасности для агентов

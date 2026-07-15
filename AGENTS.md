@@ -119,3 +119,17 @@ Before a public commit, inspect the actual staged files and run
 to make a check pass. Do not add real portfolio values, tokens, account IDs,
 local user paths, database files, backups, exports, IDE settings, agent caches,
 screenshots, or generated Python caches to Git.
+
+## Docker safety
+
+The Compose service stores the private database and local backups in the named
+`/data` volume. Never use `docker compose down -v` or replace that volume without
+explicit confirmation. A volume is not an off-machine backup; export a verified
+SQLite copy before migrations and keep an independent private copy elsewhere.
+
+Docker smoke tests must use a unique project name, port and disposable volume.
+Verify the exact volume name before removing it. Never mount, copy or inspect the
+user's live `portfolio.db` during tests. Before committing Docker changes, check
+the resolved Compose configuration, build the image, confirm the container is
+healthy and non-root, and verify that `.env`, databases, backups and exports are
+absent from the image.

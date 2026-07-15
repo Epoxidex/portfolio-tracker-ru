@@ -176,6 +176,31 @@ tool_timeout_sec = 60.0
 сервер сам читает локальный `.env` проекта и никогда не возвращает секреты через
 `get_data_status`.
 
+### MCP из Docker
+
+Сначала запустите сервис командой `docker compose up -d`. Для ручной проверки
+MCP в том же контейнере и с той же базой используйте:
+
+```bash
+docker compose exec -T portfolio python /app/mcp_server.py
+```
+
+В конфигурации Codex командой будет Docker CLI. Укажите абсолютный путь к
+`compose.yaml`; прямые слеши подходят и в Windows TOML:
+
+```toml
+[mcp_servers.portfolio_tracker]
+command = "docker"
+args = ["compose", "-f", "C:/path/to/portfolio-tracker-ru/compose.yaml", "exec", "-T", "portfolio", "python", "/app/mcp_server.py"]
+startup_timeout_sec = 20.0
+tool_timeout_sec = 60.0
+```
+
+Контейнер `portfolio` должен быть запущен до подключения клиента. Флаг `-T`
+обязателен: MCP использует чистый `stdio`, без псевдотерминала. Не передавайте
+секреты в `args` — Compose читает локальный `.env`, а база остаётся в постоянном
+томе `/data`.
+
 ## Границы точности
 
 MCP использует те же сервисы расчётов, что локальный REST API и интерфейс. Это личный

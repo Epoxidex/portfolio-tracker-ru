@@ -17,6 +17,19 @@ python scripts/check_public.py
 
 Use only a **read-only** T-Invest token. The application does not need trading or transfer permissions.
 
+## Docker
+
+Docker Compose publishes the service on `127.0.0.1` by default. Do not set
+`PORTFOLIO_BIND_ADDRESS=0.0.0.0` or forward the port from a router unless an
+authentication layer, firewall policy and explicit threat model have been added.
+The API has no login and can export or change the complete portfolio.
+
+The image build excludes `.env`, SQLite files, backups and exports. Runtime data
+lives in the named `/data` volume, and the application runs as an unprivileged
+user with a read-only root filesystem. The volume is private data: do not export,
+publish or attach it to an untrusted container. `docker compose down` preserves
+it, while `docker compose down -v` deletes it.
+
 ## MCP write access
 
 The local MCP server can change the ignored SQLite database through explicit
@@ -44,6 +57,10 @@ GitHub documents the history-rewrite process in its guide to removing sensitive 
 The optional UI backup feature stores complete, unencrypted SQLite files in a separate Git repository. That repository must remain private, must never be used as the public source-code remote, and must not contain `.env` or tokens. Anyone with repository access can read the financial data, and old backups remain in Git history.
 
 Git credentials are handled by the system credential manager. Do not embed a username, password or token in `BACKUP_GIT_REPOSITORY`. Keep another independent backup and occasionally test the restore workflow. Setup and recovery steps are documented in the README.
+
+A Docker volume survives container replacement but not loss of the host. Export
+current backups to another device or protected private storage. Treat every
+exported database exactly like the live database.
 
 ## Reporting a vulnerability
 
