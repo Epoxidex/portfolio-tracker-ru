@@ -1,5 +1,34 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  ActionIcon,
+  Alert,
+  AppShell,
+  Box,
+  Burger,
+  Button,
+  Group,
+  Loader,
+  NavLink,
+  Paper,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+  Tooltip,
+} from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
+import {
+  IconAlertCircle,
+  IconArrowUpRight,
+  IconCalendarMonth,
+  IconChartHistogram,
+  IconDatabase,
+  IconLayoutDashboard,
+  IconPlus,
+  IconRefresh,
+  IconWallet,
+} from "@tabler/icons-react";
+import {
   getPortfolioOverview,
   type PortfolioStatus,
   type PortfolioSummary,
@@ -10,20 +39,16 @@ import { DataPage } from "./pages/DataPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { OperationsPage } from "./pages/OperationsPage";
 
-type OverviewState = {
-  summary: PortfolioSummary;
-  status: PortfolioStatus;
-};
+type OverviewState = { summary: PortfolioSummary; status: PortfolioStatus };
+export type Tab = "overview" | "analytics" | "calendar" | "operations" | "data";
 
-type Tab = "overview" | "analytics" | "calendar" | "operations" | "data";
-
-const tabs: Array<{ id: Tab; label: string; short: string }> = [
-  { id: "overview", label: "Обзор", short: "Обзор" },
-  { id: "analytics", label: "Аналитика", short: "Графики" },
-  { id: "calendar", label: "Календарь", short: "Выплаты" },
-  { id: "operations", label: "Операции", short: "Сделки" },
-  { id: "data", label: "Данные", short: "Данные" },
-];
+const tabs = [
+  { id: "overview", label: "Обзор", description: "Главные показатели", icon: IconLayoutDashboard },
+  { id: "analytics", label: "Аналитика", description: "Динамика и доходность", icon: IconChartHistogram },
+  { id: "calendar", label: "Календарь", description: "Выплаты и погашения", icon: IconCalendarMonth },
+  { id: "operations", label: "Операции", description: "Покупки и движение денег", icon: IconWallet },
+  { id: "data", label: "Данные", description: "Синхронизация и бэкапы", icon: IconDatabase },
+] as const;
 
 export function App() {
   const [overview, setOverview] = useState<OverviewState | null>(null);
@@ -31,6 +56,7 @@ export function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
   const [revision, setRevision] = useState(0);
+  const [navOpened, navHandlers] = useDisclosure(false);
 
   const loadOverview = useCallback(async () => {
     setRefreshing(true);
@@ -45,58 +71,98 @@ export function App() {
     }
   }, []);
 
-  useEffect(() => {
-    void loadOverview();
-  }, [loadOverview]);
+  useEffect(() => { void loadOverview(); }, [loadOverview]);
+
+  const navigate = (next: Tab) => {
+    setTab(next);
+    navHandlers.close();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const current = tabs.find((item) => item.id === tab)!;
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <button className="brand brand-button" type="button" onClick={() => setTab("overview")} aria-label="Портфель — главная">
-          <span className="brand-mark" aria-hidden="true">◆</span>
-          <span>
-            <strong>Портфель</strong>
-            <small>личный капитал</small>
-          </span>
+    <AppShell
+      header={{ height: 72 }}
+      navbar={{ width: 272, breakpoint: "md", collapsed: { mobile: !navOpened } }}
+      padding={0}
+      className="portfolio-shell"
+    >
+      <AppShell.Header className="app-header">
+        <Group h="100%" px={{ base: "md", md: "xl" }} justify="space-between" wrap="nowrap">
+          <Group gap="sm" wrap="nowrap">
+            <Burger opened={navOpened} onClick={navHandlers.toggle} hiddenFrom="md" size="sm" aria-label="Открыть меню" />
+            <Box hiddenFrom="md">
+              <Text fw={800} size="sm">Портфель</Text>
+              <Text c="dimmed" size="xs">{current.label}</Text>
+            </Box>
+            <Box visibleFrom="md">
+              <Text size="xs" c="dimmed" fw={600}>Личный капитал</Text>
+              <Text fw={700}>{current.label}</Text>
+            </Box>
+          </Group>
+
+          <Group gap="sm" wrap="nowrap">
+            <Tooltip label="Обновить данные">
+              <ActionIcon variant="default" size="lg" radius="md" onClick={() => void loadOverview()} loading={refreshing} aria-label="Обновить данные">
+                <IconRefresh size={18} />
+              </ActionIcon>
+            </Tooltip>
+            <Button visibleFrom="xs" leftSection={<IconPlus size={17} />} radius="md" onClick={() => navigate("operations")}>Операция</Button>
+          </Group>
+        </Group>
+      </AppShell.Header>
+
+      <AppShell.Navbar className="app-navbar" p="md">
+        <button className="wordmark" type="button" onClick={() => navigate("overview")}>
+          <ThemeIcon size={42} radius={14} variant="gradient" gradient={{ from: "indigo", to: "cyan", deg: 135 }}>
+            <IconChartHistogram size={22} stroke={2.2} />
+          </ThemeIcon>
+          <span><strong>Портфель</strong><small>финансы без шума</small></span>
         </button>
 
-        <nav className="nav-tabs" aria-label="Разделы">
-          {tabs.map((item) => <button type="button" className={`nav-tab ${tab === item.id ? "active" : ""}`} onClick={() => setTab(item.id)} key={item.id}>{item.label}</button>)}
-        </nav>
+        <Stack gap={6} mt={34}>
+          <Text className="nav-section-label">Рабочее пространство</Text>
+          {tabs.map((item) => (
+            <NavLink
+              key={item.id}
+              active={tab === item.id}
+              label={item.label}
+              description={item.description}
+              leftSection={<item.icon size={20} stroke={1.8} />}
+              onClick={() => navigate(item.id)}
+              className="main-nav-link"
+            />
+          ))}
+        </Stack>
 
-        <div className="topbar-actions">
-          <a className="preview-badge" href="/">Legacy ↗</a>
-          <button
-            className="icon-button"
-            type="button"
-            onClick={() => void loadOverview()}
-            disabled={refreshing}
-            aria-label="Обновить данные"
-            title="Обновить данные"
-          >
-            <span className={refreshing ? "spin" : ""} aria-hidden="true">↻</span>
+        <Paper className="local-data-card" mt="auto" p="md" radius="lg">
+          <Group gap="xs"><span className="status-pulse" /><Text size="xs" fw={700}>Работает локально</Text></Group>
+          <Text size="xs" c="dimmed" mt={8} lh={1.5}>База и финансовые данные остаются на вашей машине.</Text>
+          <Button component="a" href="/" variant="subtle" color="gray" size="compact-sm" mt="sm" px={0} rightSection={<IconArrowUpRight size={14} />}>Открыть старый интерфейс</Button>
+        </Paper>
+      </AppShell.Navbar>
+
+      <AppShell.Main>
+        <Box className="page-canvas">
+          {error && (
+            <Alert icon={<IconAlertCircle size={18} />} title="Не удалось обновить данные" color="red" radius="lg" mb="lg" withCloseButton onClose={() => setError(null)}>
+              <Group justify="space-between"><Text size="sm">{error}</Text><Button size="compact-sm" color="red" variant="light" onClick={() => void loadOverview()}>Повторить</Button></Group>
+            </Alert>
+          )}
+          {overview ? (
+            <Page tab={tab} overview={overview} revision={revision} onNavigate={navigate} onChanged={loadOverview} />
+          ) : <LoadingDashboard />}
+        </Box>
+      </AppShell.Main>
+
+      <nav className="mobile-dock" aria-label="Разделы">
+        {tabs.map((item) => (
+          <button type="button" className={tab === item.id ? "active" : ""} onClick={() => navigate(item.id)} key={item.id}>
+            <item.icon size={20} stroke={tab === item.id ? 2.3 : 1.8} /><span>{item.label}</span>
           </button>
-        </div>
-      </header>
-
-      <main>
-        {error && (
-          <div className="error-banner" role="alert">
-            <span aria-hidden="true">!</span>
-            <div>
-              <strong>Не удалось обновить обзор</strong>
-              <p>{error}</p>
-            </div>
-            <button type="button" onClick={() => void loadOverview()}>Повторить</button>
-          </div>
-        )}
-
-        {overview ? <Page tab={tab} overview={overview} revision={revision} onNavigate={setTab} onChanged={loadOverview} /> : <LoadingDashboard />}
-      </main>
-      <nav className="mobile-nav" aria-label="Разделы">
-        {tabs.map((item) => <button type="button" className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)} key={item.id}><span aria-hidden="true">{mobileIcon(item.id)}</span>{item.short}</button>)}
+        ))}
       </nav>
-    </div>
+    </AppShell>
   );
 }
 
@@ -108,30 +174,6 @@ function Page({ tab, overview, revision, onNavigate, onChanged }: { tab: Tab; ov
   return <OverviewPage summary={overview.summary} status={overview.status} revision={revision} onNavigate={onNavigate} />;
 }
 
-function mobileIcon(tab: Tab) {
-  return ({ overview: "◆", analytics: "⌁", calendar: "□", operations: "+", data: "↻" })[tab];
-}
-
 function LoadingDashboard() {
-  return (
-    <div className="dashboard-stack" aria-label="Загрузка обзора">
-      <div className="kpi-grid">
-        {Array.from({ length: 4 }, (_, index) => (
-          <div className="kpi-card skeleton-card" key={index}>
-            <span className="skeleton line-short" />
-            <span className="skeleton line-long" />
-            <span className="skeleton line-medium" />
-          </div>
-        ))}
-      </div>
-      <div className="overview-grid">
-        {Array.from({ length: 3 }, (_, index) => (
-          <div className="panel skeleton-panel" key={index}>
-            <span className="skeleton line-medium" />
-            <span className="skeleton block" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  return <Stack align="center" justify="center" mih={420} gap="md"><Loader size="md" /><Title order={3}>Собираем финансовую картину</Title><Text c="dimmed" size="sm">Загружаем портфель и последние показатели</Text></Stack>;
 }
