@@ -4,27 +4,38 @@ import {
   type PortfolioStatus,
   type PortfolioSummary,
 } from "./api/portfolio";
-import { AllocationPanel } from "./components/AllocationPanel";
-import { GoalCard } from "./components/GoalCard";
-import { KpiGrid } from "./components/KpiGrid";
-import { SystemStatus } from "./components/SystemStatus";
-import { formatDate } from "./lib/format";
+import { AnalyticsPage } from "./pages/AnalyticsPage";
+import { CalendarPage } from "./pages/CalendarPage";
+import { OverviewPage } from "./pages/OverviewPage";
 
 type OverviewState = {
   summary: PortfolioSummary;
   status: PortfolioStatus;
 };
 
+type Tab = "overview" | "analytics" | "calendar" | "operations" | "data";
+
+const tabs: Array<{ id: Tab; label: string; short: string }> = [
+  { id: "overview", label: "Обзор", short: "Обзор" },
+  { id: "analytics", label: "Аналитика", short: "Графики" },
+  { id: "calendar", label: "Календарь", short: "Выплаты" },
+  { id: "operations", label: "Операции", short: "Сделки" },
+  { id: "data", label: "Данные", short: "Данные" },
+];
+
 export function App() {
   const [overview, setOverview] = useState<OverviewState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [tab, setTab] = useState<Tab>("overview");
+  const [revision, setRevision] = useState(0);
 
   const loadOverview = useCallback(async () => {
     setRefreshing(true);
     try {
       setOverview(await getPortfolioOverview());
       setError(null);
+      setRevision((value) => value + 1);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Не удалось загрузить портфель");
     } finally {
@@ -39,21 +50,20 @@ export function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <a className="brand" href="/react-preview/" aria-label="Портфель — главная">
+        <button className="brand brand-button" type="button" onClick={() => setTab("overview")} aria-label="Портфель — главная">
           <span className="brand-mark" aria-hidden="true">◆</span>
           <span>
             <strong>Портфель</strong>
             <small>личный капитал</small>
           </span>
-        </a>
+        </button>
 
         <nav className="nav-tabs" aria-label="Разделы">
-          <a className="nav-tab active" href="/react-preview/">Обзор</a>
-          <a className="nav-tab" href="/" title="Пока доступно в стабильном интерфейсе">Операции</a>
+          {tabs.map((item) => <button type="button" className={`nav-tab ${tab === item.id ? "active" : ""}`} onClick={() => setTab(item.id)} key={item.id}>{item.label}</button>)}
         </nav>
 
         <div className="topbar-actions">
-          <span className="preview-badge">React preview</span>
+          <a className="preview-badge" href="/">Legacy ↗</a>
           <button
             className="icon-button"
             type="button"
@@ -68,21 +78,6 @@ export function App() {
       </header>
 
       <main>
-        <section className="page-heading">
-          <div>
-            <p className="eyebrow">Финансовая картина</p>
-            <h1>Добрый вечер</h1>
-            <p className="page-subtitle">
-              {overview
-                ? `Данные портфеля на ${formatDate(overview.summary.as_of)}`
-                : "Собираем актуальные данные портфеля"}
-            </p>
-          </div>
-          <a className="legacy-link" href="/">
-            Стабильный интерфейс <span aria-hidden="true">↗</span>
-          </a>
-        </section>
-
         {error && (
           <div className="error-banner" role="alert">
             <span aria-hidden="true">!</span>
@@ -94,25 +89,29 @@ export function App() {
           </div>
         )}
 
-        {overview ? (
-          <div className="dashboard-stack">
-            <KpiGrid summary={overview.summary} />
-            <div className="overview-grid">
-              <GoalCard
-                current={overview.summary.value}
-                goal={overview.status.portfolio_goal}
-                streak={overview.summary.streak}
-              />
-              <AllocationPanel classes={overview.summary.by_class} />
-              <SystemStatus status={overview.status} />
-            </div>
-          </div>
-        ) : (
-          <LoadingDashboard />
-        )}
+        {overview ? <Page tab={tab} overview={overview} revision={revision} onNavigate={setTab} /> : <LoadingDashboard />}
       </main>
+      <nav className="mobile-nav" aria-label="Разделы">
+        {tabs.map((item) => <button type="button" className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)} key={item.id}><span aria-hidden="true">{mobileIcon(item.id)}</span>{item.short}</button>)}
+      </nav>
     </div>
   );
+}
+
+function Page({ tab, overview, revision, onNavigate }: { tab: Tab; overview: OverviewState; revision: number; onNavigate: (tab: Tab) => void }) {
+  if (tab === "analytics") return <AnalyticsPage revision={revision} />;
+  if (tab === "calendar") return <CalendarPage revision={revision} />;
+  if (tab === "operations") return <ComingSoon title="Операции" text="Формы сделок, пополнений и вкладов подключаются следующим блоком." />;
+  if (tab === "data") return <ComingSoon title="Данные" text="Импорт, обновления, Excel и резервные копии подключаются следующим блоком." />;
+  return <OverviewPage summary={overview.summary} status={overview.status} revision={revision} onNavigate={onNavigate} />;
+}
+
+function ComingSoon({ title, text }: { title: string; text: string }) {
+  return <section className="page-heading"><div><p className="eyebrow">React migration</p><h1>{title}</h1><p className="page-subtitle">{text}</p></div></section>;
+}
+
+function mobileIcon(tab: Tab) {
+  return ({ overview: "◆", analytics: "⌁", calendar: "□", operations: "+", data: "↻" })[tab];
 }
 
 function LoadingDashboard() {
