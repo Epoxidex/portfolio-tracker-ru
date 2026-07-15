@@ -8,10 +8,12 @@ from ..schemas import (
     TxIn, InstrumentIn, PriceIn, DepositIn, CurrencyHoldingIn, TrackingStartIn,
     BackupRestoreIn, CashLedgerIn, DepositOpenLedgerIn, DepositSettleLedgerIn,
     CurrencyBuyLedgerIn, CurrencySellLedgerIn, SecurityBuyLedgerIn,
-    SecuritySellLedgerIn, LedgerBatchIn,
+    SecuritySellLedgerIn, CouponScheduleIn, LedgerBatchIn,
 )
 from ..dataio import DATABASE_MAINTENANCE_LOCK, backup_database
-from ..services import portfolio, calendar as cal, snapshots, read_model, ledger
+from ..services import (
+    portfolio, calendar as cal, snapshots, read_model, ledger, coupon_schedules,
+)
 from ..services.onboarding import SetupConflict, add_currency_holding, create_deposit
 from ..services.tracking import apply_tracking_cleanup, update_env_setting
 from ..services.tinvest import fetch_prices
@@ -197,6 +199,19 @@ def ledger_buy_security(payload: SecurityBuyLedgerIn, db: Session = Depends(get_
 def ledger_sell_security(payload: SecuritySellLedgerIn, db: Session = Depends(get_db)):
     request_id, create_snapshot, action = _ledger_payload(payload, "sell_security")
     return _apply_ledger(db, request_id, [action], create_snapshot)
+
+
+@router.put("/bonds/coupon-schedule")
+def set_bond_coupon_schedule(payload: CouponScheduleIn, db: Session = Depends(get_db)):
+    data = payload.model_dump()
+    data.pop("confirm", None)
+    try:
+        with DATABASE_MAINTENANCE_LOCK:
+            return coupon_schedules.set_coupon_schedule(db, **data)
+    except coupon_schedules.CouponScheduleConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("/ledger/actions")

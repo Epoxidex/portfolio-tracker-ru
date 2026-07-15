@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from ..models import Instrument, Snapshot, Transaction
+from ..models import Instrument, MutationRequest, Snapshot, Transaction
 from . import portfolio
 
 
@@ -557,6 +557,11 @@ def apply_actions(
 ) -> dict[str, Any]:
     """Apply a user-confirmed action batch as one database transaction."""
     request_id = _request_id(request_id)
+    metadata_request = db.get(MutationRequest, request_id)
+    if metadata_request:
+        raise LedgerConflict(
+            f"request_id {request_id!r} was already used for {metadata_request.action_type}"
+        )
     if not actions:
         raise ValueError("actions cannot be empty")
     if len(actions) > 50:

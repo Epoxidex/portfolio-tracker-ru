@@ -179,6 +179,30 @@ class SecuritySellLedgerIn(SecurityTradeLedgerIn):
     total_proceeds_rub: float = Field(gt=0, le=1_000_000_000_000_000)
 
 
+class CouponPaymentIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    payment_date: date
+    coupon_per_unit_rub: float = Field(gt=0, le=1_000_000_000)
+
+
+class CouponScheduleIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: str = Field(
+        min_length=8,
+        max_length=80,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,79}$",
+    )
+    confirm: Literal[True]
+    instrument: str = Field(min_length=1, max_length=200)
+    payments: list[CouponPaymentIn] = Field(max_length=500)
+    mode: Literal["replace", "upsert"] = "replace"
+    maturity_date: Optional[date] = None
+    nominal_per_unit_rub: Optional[float] = Field(default=None, gt=0)
+    note: str = Field(default="", max_length=200)
+
+
 class LedgerBatchIn(LedgerMutationIn):
     actions: list[dict] = Field(min_length=1, max_length=50)
 

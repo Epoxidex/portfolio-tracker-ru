@@ -54,6 +54,7 @@ def test_mcp_exposes_complete_read_only_catalog(db):
                 "settle_deposit_to_rub", "buy_manual_currency",
                 "sell_manual_currency", "buy_manual_security",
                 "sell_manual_security", "apply_portfolio_actions",
+                "set_bond_coupon_schedule",
                 "synchronize_tinvest",
             } <= names
             read_tools = [tool for tool in tools if tool.name.startswith("get_") or tool.name.startswith("list_") or tool.name == "search_portfolio"]
@@ -61,6 +62,7 @@ def test_mcp_exposes_complete_read_only_catalog(db):
                 "top_up_rub_cash", "withdraw_rub_cash", "open_deposit_with_cash",
                 "settle_deposit_to_rub", "buy_manual_currency", "sell_manual_currency",
                 "buy_manual_security", "sell_manual_security", "apply_portfolio_actions",
+                "set_bond_coupon_schedule",
                 "synchronize_tinvest",
             }]
             assert all(tool.annotations.readOnlyHint is True for tool in read_tools)

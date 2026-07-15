@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from .db import Base
 
 
@@ -57,3 +57,17 @@ class Snapshot(Base):
     by_class = Column(JSON, default=dict)
     by_instrument = Column(JSON, default=dict)
     source = Column(String, default="auto")
+
+
+class MutationRequest(Base):
+    """Idempotency record for local metadata mutations that create no cash flow."""
+
+    __tablename__ = "mutation_requests"
+    request_id = Column(String, primary_key=True)
+    action_type = Column(String, nullable=False)
+    result = Column(JSON, default=dict)
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        nullable=False,
+    )

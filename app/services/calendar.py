@@ -18,17 +18,25 @@ def calendar(db, months_ahead=24, include_past=False):
         if qty <= 0 and p["kind"] != "deposit":
             continue
         if p["kind"] == "bond":
-            cpu = float(m.get("coupon_per_unit", 0))
-            ppy = m.get("payments_per_year", 0)
-            nxt = _d(m.get("next_coupon"))
             mat = _d(m.get("maturity"))
-            if cpu and ppy and nxt and mat:
-                step = _step(ppy)
-                d = nxt
-                while d < mat:
-                    ev.append(_e(d, p["name"], "Купон", round(cpu * qty, 2), p["ticker"]))
-                    d += relativedelta(months=step)
-                ev.append(_e(mat, p["name"], "Купон", round(cpu * qty, 2), p["ticker"]))
+            if "coupon_schedule" in m:
+                for payment in m.get("coupon_schedule") or []:
+                    d = _d(payment.get("payment_date"))
+                    cpu = float(payment.get("coupon_per_unit_rub", 0) or 0)
+                    if d and cpu > 0:
+                        ev.append(_e(d, p["name"], "Купон", round(cpu * qty, 2), p["ticker"]))
+            else:
+                cpu = float(m.get("coupon_per_unit", 0))
+                ppy = m.get("payments_per_year", 0)
+                nxt = _d(m.get("next_coupon"))
+                if cpu and ppy and nxt and mat:
+                    step = _step(ppy)
+                    d = nxt
+                    while d < mat:
+                        ev.append(_e(d, p["name"], "Купон", round(cpu * qty, 2), p["ticker"]))
+                        d += relativedelta(months=step)
+                    ev.append(_e(mat, p["name"], "Купон", round(cpu * qty, 2), p["ticker"]))
+            if mat:
                 ev.append(_e(mat, p["name"], "Погашение", round(qty * (m.get("nominal") or p.get("nominal") or 1000), 2), p["ticker"]))
         elif p["kind"] == "deposit":
             open_d = _d(m.get("open_date")); close_d = _d(m.get("close_date"))
@@ -81,7 +89,15 @@ def passive_income(db):
         m = p["meta"] or {}; qty = p["qty"]
         a = 0.0
         if p["kind"] == "bond" and qty > 0:
-            a = float(m.get("coupon_per_unit", 0)) * int(m.get("payments_per_year", 0) or 0) * qty
+            if "coupon_schedule" in m:
+                today = date.today()
+                horizon = _add_months(today, 12)
+                for payment in m.get("coupon_schedule") or []:
+                    payment_date = _d(payment.get("payment_date"))
+                    if payment_date and today <= payment_date <= horizon:
+                        a += float(payment.get("coupon_per_unit_rub", 0) or 0) * qty
+            else:
+                a = float(m.get("coupon_per_unit", 0)) * int(m.get("payments_per_year", 0) or 0) * qty
         elif p["kind"] == "deposit":
             a = float(m.get("principal", 0)) * float(m.get("eff_rate", 0))
         elif p["kind"] == "share" and qty > 0:

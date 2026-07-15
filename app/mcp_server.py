@@ -15,7 +15,7 @@ from . import config
 from .dataio import DATABASE_MAINTENANCE_LOCK
 from .db import SessionLocal
 from .services import calendar as cal
-from .services import ledger, portfolio, read_model, snapshots
+from .services import coupon_schedules, ledger, portfolio, read_model, snapshots
 from .services.operations import sync_operations
 from .services.tinvest import fetch_prices
 
@@ -351,6 +351,7 @@ def get_data_dictionary() -> dict[str, Any]:
             ],
             "price_point": ["ts", "price"],
             "calendar_event": ["date", "instrument", "type", "amount", "ticker"],
+            "coupon_schedule_payment": ["payment_date", "coupon_per_unit_rub"],
         },
         "instrument_identifiers": ["numeric id", "id:<number>", "ticker", "ISIN", "FIGI", "exact name"],
         "accuracy_note": (
@@ -552,6 +553,43 @@ def sell_manual_security(
         confirm=confirm,
         create_snapshot=create_snapshot,
     )
+
+
+@mcp.tool(annotations=WRITE)
+def set_bond_coupon_schedule(
+    request_id: str,
+    instrument: str,
+    payments: list[dict[str, Any]],
+    confirm: bool,
+    mode: str = "replace",
+    maturity_date: str | None = None,
+    nominal_per_unit_rub: float | None = None,
+    note: str = "",
+) -> dict[str, Any]:
+    """Добавить или изменить точный график купонов облигации в локальном календаре.
+
+    payments: объекты вида
+    {"payment_date": "YYYY-MM-DD", "coupon_per_unit_rub": 42.5}.
+    Сумма задаётся на одну облигацию, календарь умножает её на актуальное
+    количество бумаг. mode=replace полностью заменяет график; mode=upsert
+    добавляет даты и заменяет совпавшие. Пустой replace очищает график.
+    maturity_date и nominal_per_unit_rub необязательны и задают погашение.
+    Инструмент может быть из T-Invest: tool меняет только локальный прогноз.
+    """
+    if confirm is not True:
+        raise ValueError("confirm=true is required after explicit user approval")
+    with DATABASE_MAINTENANCE_LOCK:
+        with SessionLocal() as db:
+            return coupon_schedules.set_coupon_schedule(
+                db,
+                request_id=request_id,
+                instrument=instrument,
+                payments=payments,
+                mode=mode,
+                maturity_date=maturity_date,
+                nominal_per_unit_rub=nominal_per_unit_rub,
+                note=note,
+            )
 
 
 @mcp.tool(annotations=WRITE)

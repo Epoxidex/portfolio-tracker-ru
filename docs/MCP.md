@@ -42,6 +42,8 @@ Write-tools:
 - `settle_deposit_to_rub` — закрытие вклада и зачисление выплаты в RUB;
 - `buy_manual_currency` и `sell_manual_currency` — ручные валютные сделки;
 - `buy_manual_security` и `sell_manual_security` — сделки с бумагами вне T-Invest;
+- `set_bond_coupon_schedule` — точный локальный график купонов и погашения
+  облигации, включая бумаги из T-Invest;
 - `apply_portfolio_actions` — атомарный пакет до 50 связанных действий;
 - `synchronize_tinvest` — импорт операций, текущих позиций, RUB и цен из read-only API.
 
@@ -70,6 +72,30 @@ Write-tools:
   ]
 }
 ```
+
+Пример для фразы «добавь график купонов по облигации»:
+
+```json
+{
+  "request_id": "coupon-schedule-20260715-001",
+  "instrument": "RU000EXAMPLE",
+  "confirm": true,
+  "mode": "replace",
+  "payments": [
+    {"payment_date": "2026-10-15", "coupon_per_unit_rub": 42.5},
+    {"payment_date": "2027-01-15", "coupon_per_unit_rub": 42.5}
+  ],
+  "maturity_date": "2027-01-15",
+  "nominal_per_unit_rub": 1000
+}
+```
+
+`coupon_per_unit_rub` — ожидаемая сумма на одну облигацию. Календарь умножает
+её на актуальное количество бумаг, поэтому после синхронизации покупки или
+продажи прогноз автоматически меняется. `replace` полностью заменяет график,
+а `upsert` добавляет новые даты и обновляет совпавшие. Пустой `replace` очищает
+ручной график. Это прогноз: фактически полученный купон по-прежнему записывается
+отдельной операцией или импортируется из T-Invest.
 
 Также доступны ресурсы `portfolio://status`, `portfolio://summary`,
 `portfolio://positions`, `portfolio://income`, `portfolio://cash`,
@@ -102,10 +128,12 @@ Write-tools:
 - `POST /api/ledger/deposits/open` и `/api/ledger/deposits/settle`;
 - `POST /api/ledger/currencies/buy` и `/api/ledger/currencies/sell`;
 - `POST /api/ledger/securities/buy` и `/api/ledger/securities/sell`;
-- `POST /api/ledger/actions` для атомарного пакета.
+- `POST /api/ledger/actions` для атомарного пакета;
+- `PUT /api/bonds/coupon-schedule` для точного графика купонов и погашения.
 
-Каждый POST принимает `request_id`, буквальное `confirm: true` и необязательный
-`create_snapshot`. Поля конкретного действия совпадают с параметрами MCP tools.
+Каждая мутация принимает `request_id` и буквальное `confirm: true`. Денежные
+POST-запросы также принимают необязательный `create_snapshot`. Поля конкретного
+действия совпадают с параметрами MCP tools.
 
 ## Установка и локальная проверка
 

@@ -70,11 +70,25 @@ the broker RUB balance and takes a snapshot. Bond repayment is represented as a
 sale for the repaid amount. Securities that are genuinely tracked outside
 T-Invest can use the manual buy/sell ledger and the same moving-average cost rule.
 
+### Bond coupon schedules
+
+An exact user-supplied coupon schedule takes precedence over the legacy estimate
+based on one coupon amount, payment frequency and next coupon date. Each schedule
+row stores a payment date and the expected coupon in RUB per bond. The calendar
+multiplies it by the current quantity, so a later purchase, sale or T-Invest
+position synchronization changes all future expected totals automatically.
+
+The optional maturity date creates a separate nominal-repayment event. Schedule
+entries are forecasts only: they do not create income transactions or RUB. An
+actual coupon is recorded separately, normally by T-Invest synchronization. A
+manual schedule can therefore enrich a T-Invest instrument without pretending
+that a broker trade or payment occurred.
+
 ## Data-source limitations
 
 - T-Invest synchronization imports the operation types the application understands: buys, sells, coupons, dividends and bond repayments. Taxes, fees and some corporate actions are not yet a complete accounting model.
 - T-Bank itself recommends a broker report when operation history must be exact; some corporate-action history can be incomplete in the API.
-- Future coupon/dividend calendars require instrument metadata. A newly discovered instrument can have a price and transaction history before its future-payment metadata is available.
+- Future coupon/dividend calendars require instrument metadata. A newly discovered instrument can have a price and transaction history before its future-payment metadata is available. An exact bond schedule can be supplied through REST or MCP until automatic source data is available.
 - The official CBR rate is the default currency source. `bank_buy` and `bank_sell` scrape one configured third-party bank page and can stop working when that page changes.
 - Automatic snapshots exist only while the application is running. Missing reference periods intentionally produce no comparison.
 - Monetary values currently use floating-point numbers. This is sufficient for a dashboard but not for tax-grade kopek reconciliation.
