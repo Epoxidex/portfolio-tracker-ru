@@ -1,10 +1,17 @@
+import { Paper, SimpleGrid, Text } from "@mantine/core";
 import type { ReturnDelta } from "../api/dashboard";
 import { formatMoney, formatPercent } from "../lib/format";
 
 export function PerformanceStrip({ values }: { values: Array<{ label: string; delta?: ReturnDelta }> }) {
-  return <section className="performance-strip">{values.map(({ label, delta }) => {
-    const available = delta?.change != null && delta.pct != null;
-    const positive = (delta?.change ?? 0) >= 0;
-    return <article key={label}><span>{label}</span><strong className={available ? positive ? "positive" : "negative" : "neutral"}>{available ? formatMoney(delta.change!, true) : "—"}</strong><small className={available ? positive ? "positive" : "negative" : "neutral"}>{available ? formatPercent(delta.pct!) : "нет опорного снимка"}</small></article>;
-  })}</section>;
+  return (
+    <Paper className="performance-card" radius="lg" p={6}>
+      <SimpleGrid cols={{ base: 2, md: 4 }} spacing={0}>
+        {values.map(({ label, delta }) => {
+          const available = delta?.change != null && delta.pct != null;
+          const positive = (delta?.change ?? 0) >= 0;
+          return <div className="performance-cell" key={label}><Text size="xs" c="gray.5">{label}</Text><Text fw={760} size="lg" mt={5} c={available ? positive ? "teal.3" : "red.3" : "white"}>{available ? formatMoney(delta.change!, true) : "—"}</Text><Text size="xs" c={available ? positive ? "teal.4" : "red.4" : "gray.6"}>{available ? formatPercent(delta.pct!) : "нет опорного снимка"}</Text></div>;
+        })}
+      </SimpleGrid>
+    </Paper>
+  );
 }

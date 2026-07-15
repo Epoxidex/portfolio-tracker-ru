@@ -1,21 +1,15 @@
+import { Box, Group, Text, Title } from "@mantine/core";
 import type { ReactNode } from "react";
 
-type PageHeadingProps = {
-  eyebrow: string;
-  title: string;
-  subtitle: string;
-  actions?: ReactNode;
-};
-
-export function PageHeading({ eyebrow, title, subtitle, actions }: PageHeadingProps) {
+export function PageHeading({ eyebrow, title, subtitle, actions }: { eyebrow: string; title: string; subtitle: string; actions?: ReactNode }) {
   return (
-    <section className="page-heading">
-      <div>
-        <p className="eyebrow">{eyebrow}</p>
-        <h1>{title}</h1>
-        <p className="page-subtitle">{subtitle}</p>
-      </div>
-      {actions && <div className="heading-actions">{actions}</div>}
-    </section>
+    <Group className="page-heading" justify="space-between" align="flex-end" wrap="wrap">
+      <Box>
+        <Text className="eyebrow">{eyebrow}</Text>
+        <Title order={1}>{title}</Title>
+        <Text className="subtitle">{subtitle}</Text>
+      </Box>
+      {actions && <Group>{actions}</Group>}
+    </Group>
   );
 }

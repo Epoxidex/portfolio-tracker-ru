@@ -1,55 +1,20 @@
+import { DonutChart } from "@mantine/charts";
+import { Box, Group, Paper, Stack, Text, Title } from "@mantine/core";
 import type { PortfolioClassSummary } from "../api/portfolio";
 import { formatMoney, formatPercent } from "../lib/format";
 
-type AllocationPanelProps = {
-  classes: Record<string, PortfolioClassSummary>;
-};
-
-const colors = ["#f6c760", "#6ea8fe", "#58d6c2", "#b596f5", "#fb8f67", "#f67b91"];
-
-export function AllocationPanel({ classes }: AllocationPanelProps) {
-  const rows = Object.entries(classes)
-    .sort(([, left], [, right]) => right.value - left.value);
-  const total = rows.reduce((sum, [, item]) => sum + item.value, 0);
-
+const colors = ["indigo.6", "cyan.6", "teal.6", "violet.5", "orange.5", "pink.5"];
+export function AllocationPanel({ classes }: { classes: Record<string, PortfolioClassSummary> }) {
+  const rows = Object.entries(classes).sort(([,a],[,b])=>b.value-a.value);
+  const total = rows.reduce((sum,[,item])=>sum+item.value,0);
+  const data = rows.map(([name,item],index)=>({ name, value: item.value, color: colors[index%colors.length] }));
   return (
-    <article className="panel allocation-panel">
-      <div className="panel-heading">
-        <div>
-          <p className="panel-kicker">Структура</p>
-          <h2>Классы активов</h2>
-        </div>
-        <span className="panel-meta">{rows.length} классов</span>
-      </div>
-
-      {rows.length ? (
-        <div className="allocation-list">
-          {rows.map(([name, item], index) => {
-            const share = total ? item.value / total : 0;
-            return (
-              <div className="allocation-row" key={name}>
-                <span className="allocation-swatch" style={{ background: colors[index % colors.length] }} />
-                <div className="allocation-name">
-                  <strong>{name}</strong>
-                  <span>{formatPercent(share, false)} портфеля</span>
-                </div>
-                <div className="allocation-value">
-                  <strong>{formatMoney(item.value)}</strong>
-                  <span className={item.pnl >= 0 ? "positive" : "negative"}>
-                    {formatMoney(item.pnl, true)}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="empty-state">
-          <span aria-hidden="true">◎</span>
-          <strong>Активов пока нет</strong>
-          <p>Добавьте первую позицию в стабильном интерфейсе или через MCP.</p>
-        </div>
-      )}
-    </article>
+    <Paper withBorder radius="lg" p="xl" className="feature-card">
+      <Group justify="space-between"><div><Text className="section-kicker">Структура</Text><Title order={3}>Классы активов</Title></div><Text size="xs" c="dimmed">{rows.length} классов</Text></Group>
+      {rows.length ? <Group align="center" mt="xl" wrap="nowrap" className="allocation-content">
+        <DonutChart data={data} size={142} thickness={18} tooltipDataSource="segment" chartLabel={formatMoney(total)} />
+        <Stack gap="sm" style={{flex:1}}>{rows.slice(0,5).map(([name,item],index)=><Group key={name} justify="space-between" wrap="nowrap"><Group gap="xs" wrap="nowrap"><Box w={8} h={8} bg={`var(--mantine-color-${colors[index%colors.length].replace('.', '-')})`} style={{borderRadius:99}}/><div><Text size="xs" fw={700}>{name}</Text><Text size="xs" c="dimmed">{formatPercent(total ? item.value/total : 0,false)}</Text></div></Group><Text size="xs" fw={700}>{formatMoney(item.value)}</Text></Group>)}</Stack>
+      </Group> : <Text c="dimmed" ta="center" py={60}>Активов пока нет</Text>}
+    </Paper>
   );
 }

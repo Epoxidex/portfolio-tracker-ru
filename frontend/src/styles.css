@@ -31,6 +31,24 @@ button, input, select { font: inherit; }
 .local-data-card { background: #f7f8fa; border: 1px solid #eaecf0; }
 .status-pulse { width: 8px; height: 8px; border-radius: 50%; background: #18a67d; box-shadow: 0 0 0 5px rgba(24,166,125,.1); }
 .mobile-dock { display: none; }
+.metric-card { box-shadow: 0 8px 28px rgba(16,24,40,.045); }
+.metric-value { color: #101828; font-size: clamp(22px, 2vw, 30px); font-weight: 780; letter-spacing: -.045em; line-height: 1; }
+.performance-card { background: #101828; box-shadow: 0 18px 44px rgba(16,24,40,.15); }
+.performance-cell { min-height: 94px; display: grid; align-content: center; padding: 14px 20px; border-right: 1px solid rgba(255,255,255,.1); }
+.performance-cell:last-child { border-right: 0; }
+.feature-card { min-height: 310px; box-shadow: 0 8px 28px rgba(16,24,40,.04); }
+.section-kicker { margin-bottom: 6px; color: #4c6ef5; font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.goal-percent { font-size: 34px; font-weight: 780; letter-spacing: -.045em; }
+.allocation-content { min-height: 188px; }
+.status-item { min-height: 53px; border-bottom: 1px solid #f0f1f4; }
+.status-item:last-child { border-bottom: 0; }
+.asset-avatar { width: 36px; height: 36px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 11px; color: #3b5bdb; background: #edf2ff; font-size: 10px; font-weight: 800; }
+.onboarding-modern { margin-bottom: 18px; color: #fff; background: linear-gradient(125deg,#3448b8,#4c6ef5 58%,#20b8cd); box-shadow: 0 18px 42px rgba(76,110,245,.22); }
+.onboarding-modern .section-kicker, .onboarding-modern .mantine-Text-root { color: rgba(255,255,255,.76); }
+.leader-row { min-height: 67px; border-bottom: 1px solid #f0f1f4; }
+.leader-row:last-child { border-bottom: 0; }
+.rank-chip { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 10px; color: #667085; background: #f2f4f7; font-size: 11px; font-weight: 750; }
+.leader-value { min-width: 125px; text-align: right; }
 
 .page-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
 .page-heading > div:first-child { max-width: 760px; }
@@ -104,4 +122,5 @@ button, input, select { font: inherit; }
 @media (max-width: 767px) {
   .page-canvas{padding:26px 14px 100px}.mobile-dock{position:fixed;z-index:300;left:10px;right:10px;bottom:10px;display:grid;grid-template-columns:repeat(5,1fr);padding:6px;border:1px solid rgba(255,255,255,.12);border-radius:18px;background:rgba(16,24,40,.94);box-shadow:0 16px 40px rgba(16,24,40,.3);backdrop-filter:blur(18px)}.mobile-dock button{display:grid;justify-items:center;gap:3px;border:0;background:transparent;color:#98a2b3;padding:6px 2px;font-size:8px}.mobile-dock button.active{color:#fff}.page-heading{align-items:flex-start}.page-heading h1{font-size:34px}.page-heading .legacy-link{display:none}.kpi-grid,.overview-grid{grid-template-columns:1fr}.performance-strip{grid-template-columns:1fr 1fr}.performance-strip article:nth-child(2){border-right:0}.performance-strip article:nth-child(-n+2){border-bottom:1px solid rgba(255,255,255,.1)}.income-hero{grid-template-columns:1fr}.income-hero>div+div{border-left:0;border-top:1px solid #dfe4ec;padding:20px 0 0}.service-grid{grid-template-columns:1fr}.service-card:last-child{grid-column:auto}.cash-strip{grid-template-columns:1fr 1fr}.cash-note{grid-column:1/-1}.operation-form{grid-template-columns:1fr}.submit-button{grid-column:auto;width:100%}.leader-modern{grid-template-columns:28px 1fr auto}.leader-modern>span:nth-child(3){display:none}.single-form{grid-template-columns:1fr}
 }
+@media (max-width: 767px) { .performance-cell:nth-child(2){border-right:0}.performance-cell:nth-child(-n+2){border-bottom:1px solid rgba(255,255,255,.1)}.allocation-content{align-items:flex-start;flex-direction:column}.allocation-content .mantine-DonutChart-root{align-self:center}.leader-value:first-child{display:none}.leader-value{min-width:auto}.onboarding-modern>.mantine-Group-root{align-items:flex-start;flex-direction:column}.onboarding-modern .mantine-Group-root{align-items:flex-start} }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}

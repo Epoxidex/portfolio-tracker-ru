@@ -1,39 +1,9 @@
+import { Badge, Group, ScrollArea, Table, Text } from "@mantine/core";
 import type { Position } from "../api/dashboard";
 import { formatMoney, formatPercent } from "../lib/format";
 
-const kindNames: Record<string, string> = {
-  bond: "Облигация",
-  share: "Акция",
-  etf: "Фонд",
-  currency: "Валюта",
-  deposit: "Вклад",
-};
-
-export function PositionsTable({ positions }: { positions: Position[] }) {
-  if (!positions.length) {
-    return <div className="empty-state compact"><strong>Активных позиций пока нет</strong><p>Добавьте актив или импортируйте портфель из T‑Invest.</p></div>;
-  }
-
-  return (
-    <div className="data-table-wrap">
-      <table className="data-table">
-        <thead><tr><th>Инструмент</th><th>Количество</th><th>Вложено</th><th>Стоимость</th><th>Результат</th></tr></thead>
-        <tbody>
-          {positions.map((position) => (
-            <tr key={position.id}>
-              <td>
-                <span className="instrument-cell"><strong>{position.ticker || position.name}</strong><small>{position.ticker ? position.name : kindNames[position.kind] || position.kind}</small></span>
-              </td>
-              <td>{position.qty.toLocaleString("ru-RU", { maximumFractionDigits: 4 })} <small>{position.currency !== "RUB" ? position.currency : ""}</small></td>
-              <td>{formatMoney(position.invested)}</td>
-              <td><strong>{formatMoney(position.value)}</strong></td>
-              <td className={position.pnl >= 0 ? "positive" : "negative"}>
-                <strong>{formatMoney(position.pnl, true)}</strong><small>{formatPercent(position.pnl_pct)}</small>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+const kindNames: Record<string,string>={bond:"Облигация",share:"Акция",etf:"Фонд",currency:"Валюта",deposit:"Вклад"};
+export function PositionsTable({positions}:{positions:Position[]}) {
+  if(!positions.length) return <Text c="dimmed" ta="center" py={60}>Активных позиций пока нет</Text>;
+  return <ScrollArea mt="lg"><Table verticalSpacing="md" horizontalSpacing="md" miw={760} highlightOnHover><Table.Thead><Table.Tr><Table.Th>Инструмент</Table.Th><Table.Th ta="right">Количество</Table.Th><Table.Th ta="right">Вложено</Table.Th><Table.Th ta="right">Стоимость</Table.Th><Table.Th ta="right">Результат</Table.Th></Table.Tr></Table.Thead><Table.Tbody>{positions.map(position=><Table.Tr key={position.id}><Table.Td><Group gap="sm" wrap="nowrap"><div className="asset-avatar">{(position.ticker||position.name).slice(0,2).toUpperCase()}</div><div><Text size="sm" fw={750}>{position.ticker||position.name}</Text><Text size="xs" c="dimmed">{position.ticker?position.name:kindNames[position.kind]||position.kind}</Text></div></Group></Table.Td><Table.Td ta="right"><Text size="sm">{position.qty.toLocaleString("ru-RU",{maximumFractionDigits:4})}</Text>{position.currency!=="RUB"&&<Text size="xs" c="dimmed">{position.currency}</Text>}</Table.Td><Table.Td ta="right"><Text size="sm">{formatMoney(position.invested)}</Text></Table.Td><Table.Td ta="right"><Text size="sm" fw={700}>{formatMoney(position.value)}</Text></Table.Td><Table.Td ta="right"><Text size="sm" fw={700} c={position.pnl>=0?"teal.7":"red.6"}>{formatMoney(position.pnl,true)}</Text><Badge size="xs" variant="light" color={position.pnl>=0?"teal":"red"}>{formatPercent(position.pnl_pct)}</Badge></Table.Td></Table.Tr>)}</Table.Tbody></Table></ScrollArea>;
 }
