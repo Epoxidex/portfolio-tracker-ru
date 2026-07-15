@@ -1,0 +1,13 @@
+services:
+  portfolio:
+    environment:
+      GIT_ASKPASS: /app/docker/git-askpass.sh
+      GIT_ASKPASS_REQUIRE: force
+      GIT_TERMINAL_PROMPT: "0"
+      PORTFOLIO_GITHUB_TOKEN_FILE: /run/secrets/github_backup_token
+    secrets:
+      - github_backup_token
+
+secrets:
+  github_backup_token:
+    file: ${PORTFOLIO_GITHUB_TOKEN_SOURCE:-.secrets/github_token}

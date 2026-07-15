@@ -62,11 +62,31 @@ def _configured_repository() -> str:
         parsed = urlsplit(repository)
         if parsed.username or parsed.password:
             raise GitBackupError("Не храните логин или токен в BACKUP_GIT_REPOSITORY")
+    token_file = os.getenv("PORTFOLIO_GITHUB_TOKEN_FILE", "").strip()
+    if token_file:
+        parsed = urlsplit(repository)
+        if parsed.scheme != "https" or parsed.hostname != "github.com":
+            raise GitBackupError(
+                "Docker secret GitHub поддерживает только HTTPS-адрес github.com без логина"
+            )
+        secret = Path(token_file)
+        if not secret.is_file() or not os.access(secret, os.R_OK):
+            raise GitBackupError("Docker secret с GitHub-токеном недоступен контейнеру")
     return repository
 
 
 def _friendly_git_error(output: str, action: str) -> str:
     text = output.lower()
+    if os.getenv("PORTFOLIO_GITHUB_TOKEN_FILE", "").strip() and (
+        "authentication failed" in text
+        or "could not read username" in text
+        or "permission denied" in text
+        or "403" in text
+    ):
+        return (
+            "GitHub не принял Docker secret. Проверьте срок токена, доступ к нужному "
+            "репозиторию и разрешение Contents"
+        )
     if "authentication failed" in text or "could not read username" in text:
         return "GitHub не принял авторизацию. Сначала выполните обычный git push из терминала"
     if "repository not found" in text or "not found" in text:

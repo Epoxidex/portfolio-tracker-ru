@@ -9,12 +9,45 @@ from app.dataio import backup_database
 from app.db import SessionLocal
 from app.main import app
 from app.models import Instrument
+from app.services import git_backup
 
 
 def test_default_backup_directory_follows_private_database(db):
     backup = backup_database()
     assert backup.parent == config.DB_PATH.parent / "backups"
     assert backup.is_file()
+
+
+def test_github_secret_requires_github_https_repository(tmp_path, monkeypatch):
+    secret = tmp_path / "github-token"
+    secret.write_text("placeholder-token", encoding="utf-8")
+    monkeypatch.setenv("PORTFOLIO_GITHUB_TOKEN_FILE", str(secret))
+    monkeypatch.setattr(config, "BACKUP_GIT_REPOSITORY", "https://example.com/private/vault.git")
+
+    with pytest.raises(git_backup.GitBackupError, match="только HTTPS-адрес github.com"):
+        git_backup._configured_repository()
+
+
+def test_github_secret_must_be_readable(tmp_path, monkeypatch):
+    monkeypatch.setenv("PORTFOLIO_GITHUB_TOKEN_FILE", str(tmp_path / "missing"))
+    monkeypatch.setattr(
+        config,
+        "BACKUP_GIT_REPOSITORY",
+        "https://github.com/example/private-vault.git",
+    )
+
+    with pytest.raises(git_backup.GitBackupError, match="недоступен контейнеру"):
+        git_backup._configured_repository()
+
+
+def test_github_secret_accepts_scoped_https_repository(tmp_path, monkeypatch):
+    secret = tmp_path / "github-token"
+    secret.write_text("placeholder-token", encoding="utf-8")
+    repository = "https://github.com/example/private-vault.git"
+    monkeypatch.setenv("PORTFOLIO_GITHUB_TOKEN_FILE", str(secret))
+    monkeypatch.setattr(config, "BACKUP_GIT_REPOSITORY", repository)
+
+    assert git_backup._configured_repository() == repository
 
 
 def _git(*args, cwd=None):

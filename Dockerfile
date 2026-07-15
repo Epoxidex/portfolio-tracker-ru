@@ -39,10 +39,12 @@ RUN python -m pip install --requirement requirements.txt
 COPY app/ ./app/
 COPY static/ ./static/
 COPY docs/ ./docs/
+COPY docker/ ./docker/
 COPY mcp_server.py LICENSE ./
 COPY --from=frontend-build /build/frontend/dist ./frontend/dist/
 
 RUN mkdir -p /data/backups /data/home/.config \
+    && chmod 0555 /app/docker/git-askpass.sh \
     && chown -R portfolio:portfolio /data
 
 USER portfolio:portfolio

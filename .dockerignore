@@ -3,6 +3,7 @@
 .gitignore
 .env
 .env.*
+.secrets
 .venv
 venv
 __pycache__
@@ -34,6 +35,7 @@ scripts
 .claude
 .agents
 .codex
+compose.github.yaml
 run.ps1
 run.sh
 AGENTS.md
