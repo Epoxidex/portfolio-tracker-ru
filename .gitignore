@@ -28,6 +28,10 @@ build/
 dist/
 *.egg-info/
 
+# Frontend
+node_modules/
+frontend/dist/
+
 # Logs, editors and local agent settings
 *.log
 .idea/
