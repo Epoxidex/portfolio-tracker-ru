@@ -80,7 +80,7 @@ def test_matured_deposit_does_not_disappear_before_reconciliation(db):
     assert result[0]["value"] == pytest.approx(110_000)
 
 
-def test_broker_current_quantity_hides_stale_imported_position(db):
+def test_broker_current_quantity_uses_recorded_cost_and_hides_stale_position(db):
     current = Instrument(
         kind="share", name="Current", ticker="CUR", figi="FIGI-CUR",
         last_price=100, meta={},
@@ -113,7 +113,67 @@ def test_broker_current_quantity_hides_stale_imported_position(db):
     result = positions(db)
     assert [row["ticker"] for row in result] == ["CUR"]
     assert result[0]["qty"] == 2
-    assert result[0]["pnl"] == -10
+    assert result[0]["invested"] == 220
+    assert result[0]["pnl"] == -20
+
+
+def test_broker_bond_cost_does_not_grow_with_nkd_or_expected_yield(db):
+    bond = Instrument(
+        kind="bond", name="Bond", ticker="BND", figi="FIGI-BND",
+        last_price=100, nkd=1, meta={},
+    )
+    db.add(bond)
+    db.flush()
+    db.add(Transaction(
+        ts=date(2026, 7, 1), instrument_id=bond.id, kind="buy",
+        quantity=2, amount=-215, note="op:bond-buy",
+    ))
+    db.commit()
+
+    _sync_portfolio_state(db, [bond], {"FIGI-BND": SimpleNamespace(
+        quantity=2.0,
+        average_position_price=105.0,
+        expected_yield=-8.0,
+    )})
+    first = positions(db)[0]
+
+    bond.nkd = 2
+    bond.meta = {
+        **bond.meta,
+        "tinvest_expected_yield": -10.0,
+    }
+    db.commit()
+    second = positions(db)[0]
+
+    assert first["invested"] == 215
+    assert second["invested"] == 215
+    assert first["value"] == 202
+    assert second["value"] == 204
+
+
+def test_broker_position_uses_average_price_when_operation_history_is_partial(db):
+    asset = Instrument(
+        kind="share", name="Partial", ticker="PART", figi="FIGI-PART",
+        last_price=110, meta={},
+    )
+    db.add(asset)
+    db.flush()
+    db.add(Transaction(
+        ts=date(2026, 7, 1), instrument_id=asset.id, kind="buy",
+        quantity=2, amount=-220, note="op:partial-buy",
+    ))
+    db.commit()
+
+    _sync_portfolio_state(db, [asset], {"FIGI-PART": SimpleNamespace(
+        quantity=3.0,
+        average_position_price=105.0,
+        expected_yield=15.0,
+    )})
+
+    result = positions(db)[0]
+    assert result["qty"] == 3
+    assert result["invested"] == 315
+    assert result["pnl"] == 15
 
 
 def test_moving_average_cost_handles_sell_then_repurchase():

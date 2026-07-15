@@ -4,7 +4,7 @@ This application is a personal dashboard, not a broker report or accounting syst
 
 ## Positions and P&L
 
-- Securities and foreign currency use a moving weighted-average cost basis. A sale realizes the difference between its proceeds and the released average cost; a later purchase starts from the remaining cost basis.
+- Securities and foreign currency use a moving weighted-average cost basis. A sale realizes the difference between its proceeds and the released average cost; a later purchase starts from the remaining cost basis. For a T-Invest position, the broker quantity is authoritative, while cost comes from recorded operations when they explain that quantity. If the imported history is incomplete, the broker average price is used instead. Current market value and `expected_yield` never redefine historical cost.
 - Bond value includes the current clean price plus accrued coupon income (НКД).
 - Current P&L is unrealized P&L plus recorded coupons/dividends and realized P&L for positions that remain open.
 - Fully closed positions are not shown in the active positions table. This means the dashboard is primarily a view of the current portfolio, not a lifetime tax ledger.

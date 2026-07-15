@@ -122,6 +122,26 @@ def _moving_average_book(txs, buy_kind: str, sell_kind: str):
     return quantity, cost, realized
 
 
+def _broker_position_cost(txs, broker_quantity: float, average_price: float) -> float:
+    """Return a stable cost basis for a broker-authoritative position.
+
+    T-Invest ``expected_yield`` is a current result, not a cost-basis field. In
+    particular, subtracting it from a bond's dirty value can move ``invested``
+    as accrued coupon income changes. Prefer the cash cost recorded by actual
+    operations when that ledger explains the broker quantity. If tracking
+    started after the position was opened, use the broker's average price.
+    """
+    book_quantity, book_cost, _ = _moving_average_book(txs, "buy", "sell")
+    tolerance = max(1e-6, abs(broker_quantity) * 1e-8)
+    if book_cost > 0 and abs(book_quantity - broker_quantity) <= tolerance:
+        return book_cost
+    if average_price > 0:
+        return average_price * broker_quantity
+    if book_quantity > 0 and book_cost > 0:
+        return book_cost / book_quantity * broker_quantity
+    return 0.0
+
+
 def _add_months(d0, n):
     y = d0.year + (d0.month - 1 + n) // 12
     mth = (d0.month - 1 + n) % 12 + 1
@@ -193,17 +213,9 @@ def positions(db, on=None):
                 continue
             dirty = inst.last_price + (inst.nkd if inst.kind == "bond" else 0)
             value = qty * dirty
-            expected_yield = float(meta.get("tinvest_expected_yield", 0) or 0)
             average_price = float(meta.get("tinvest_average_price", 0) or 0)
-            if value - expected_yield > 0:
-                invested = value - expected_yield
-                unrealized = expected_yield
-            elif average_price > 0:
-                invested = average_price * qty
-                unrealized = value - invested
-            else:
-                _, invested, _ = _moving_average_book(txs, "buy", "sell")
-                unrealized = value - invested
+            invested = _broker_position_cost(txs, qty, average_price)
+            unrealized = value - invested
             income = sum(t.amount for t in txs if t.kind in ("coupon", "dividend"))
             out.append(_pos(inst, qty=qty, invested=invested, value=value,
                             income=income, unrealized=unrealized, realized=0))
