@@ -1,71 +1,34 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback,useEffect,useState,type FormEvent,type ReactNode } from "react";
+import { Alert,Badge,Button,Group,Paper,Radio,SimpleGrid,Stack,Text,ThemeIcon,Title } from "@mantine/core";
+import { IconAlertTriangle,IconArrowsExchange,IconCamera,IconCircleCheck,IconCloudDownload,IconDatabaseExport,IconFileSpreadsheet,IconRefresh,IconRestore,IconShieldLock } from "@tabler/icons-react";
 import type { PortfolioStatus } from "../api/portfolio";
-import { createBackup, getBackups, restoreBackup, runAction, mutate, type BackupItem } from "../api/actions";
-import { Field, SelectField, SubmitButton } from "../components/FormFields";
+import { createBackup,getBackups,restoreBackup,runAction,mutate,type BackupItem } from "../api/actions";
+import { Field,SelectField,SubmitButton } from "../components/FormFields";
 import { PageHeading } from "../components/PageHeading";
 import { formatDate } from "../lib/format";
 
-type Props = { status: PortfolioStatus; onChanged: () => Promise<void> };
-
-export function DataPage({ status, onChanged }: Props) {
-  const [busy, setBusy] = useState<string | null>(null);
-  const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null);
-  const [backups, setBackups] = useState<BackupItem[]>([]);
-  const [backupError, setBackupError] = useState<string | null>(null);
-  const [selectedBackup, setSelectedBackup] = useState("");
-
-  const loadBackups = useCallback(async () => {
-    try { const result = await getBackups(); setBackups(result.items); setSelectedBackup((value) => value || result.items[0]?.name || ""); setBackupError(null); }
-    catch (error) { setBackupError(error instanceof Error ? error.message : "Не удалось загрузить бэкапы"); }
-  }, []);
-  useEffect(() => { void loadBackups(); }, [loadBackups]);
-
-  const perform = async (key: string, task: () => Promise<unknown>, success: string, refresh = true) => {
-    setBusy(key); setMessage(null);
-    try { await task(); setMessage({ text: success }); if (refresh) await onChanged(); }
-    catch (error) { setMessage({ text: error instanceof Error ? error.message : "Операция не выполнена", error: true }); }
-    finally { setBusy(null); }
-  };
-
-  const trackingSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); const data = new FormData(event.currentTarget); const date = String(data.get("start_date"));
-    if (!window.confirm(`Изменить начало учёта на ${date}? Перед очисткой старых импортов будет создан бэкап.`)) return;
-    void perform("tracking", () => mutate("/settings/tracking-start", { start_date: date, confirm: true }), "Дата начала учёта обновлена");
-  };
-  const fxSubmit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = new FormData(event.currentTarget); void perform("fx", () => runAction(`/fetch/fx?source=${data.get("source")}`), "Курсы валют обновлены"); };
-  const doRestore = async () => {
-    if (!selectedBackup || !window.confirm(`Восстановить базу из ${selectedBackup}? Текущая база будет сохранена отдельно.`)) return;
-    setBusy("restore"); setMessage(null);
-    try { await restoreBackup(selectedBackup); window.location.reload(); }
-    catch (error) { setMessage({ text: error instanceof Error ? error.message : "Не удалось восстановить базу", error: true }); setBusy(null); }
-  };
-
-  return (
-    <>
-      <PageHeading eyebrow="Управление" title="Данные и сервис" subtitle="Синхронизация, курсы, снимки, экспорт, резервные копии и граница истории" />
-      {message && <div className={`notice ${message.error ? "error" : "success"}`}>{message.text}</div>}
-      <section className="service-grid">
-        <ServiceCard icon="⇄" title="T‑Invest" text={status.tinvest.configured ? "Read-only подключение настроено" : "Токен не настроен"} tone={status.tinvest.configured ? "good" : "muted"}><button className="primary-button" disabled={!status.tinvest.configured || busy !== null} onClick={() => void perform("sync", () => runAction("/sync/tinvest?days=3650"), "Операции и цены синхронизированы")}>{busy === "sync" ? "Импортируем…" : "Импортировать всё"}</button><button className="secondary-button" disabled={!status.tinvest.configured || busy !== null} onClick={() => void perform("prices", () => runAction("/fetch/prices"), "Цены обновлены")}>Только цены</button></ServiceCard>
-        <ServiceCard icon="◉" title="Снимок" text={`${status.data.snapshots} сохранённых точек истории`} tone="good"><button className="primary-button" disabled={busy !== null} onClick={() => void perform("snapshot", () => runAction("/snapshot"), "Снимок портфеля создан")}>{busy === "snapshot" ? "Сохраняем…" : "Создать снимок"}</button><a className="secondary-button button-link" href="/api/export/excel">Скачать Excel</a></ServiceCard>
-        <ServiceCard icon="₽" title="Курсы валют" text={`Текущий источник: ${sourceName(status.fx_source)}`} tone="good"><form className="inline-form" onSubmit={fxSubmit}><SelectField label="Источник" name="source" defaultValue={status.fx_source}><option value="cbr">ЦБ РФ</option><option value="bank_buy">Банк покупает</option><option value="bank_sell">Банк продаёт</option></SelectField><SubmitButton busy={busy === "fx"}>Обновить курсы</SubmitButton></form></ServiceCard>
-      </section>
-      <div className="data-settings-grid">
-        <section className="panel settings-panel">
-          <div className="panel-heading"><div><p className="panel-kicker">Граница истории</p><h2>Начало учёта</h2></div></div>
-          <p className="settings-copy">Операции T‑Invest до выбранной даты будут исключены. Ручные активы сохранятся, перед изменением создастся резервная копия.</p>
-          <form className="single-form" onSubmit={trackingSubmit}><Field label="Учитывать портфель начиная с" name="start_date" type="date" defaultValue={status.tracking_start_date ?? ""} required /><SubmitButton busy={busy === "tracking"}>Применить дату</SubmitButton></form>
-          <div className="jobs-list"><span>Автоснимки <b>{jobLabel(status.background_jobs_minutes.snapshots)}</b></span><span>Цены T‑Invest <b>{jobLabel(status.background_jobs_minutes.tinvest_prices)}</b></span><span>Курсы валют <b>{jobLabel(status.background_jobs_minutes.currency_rates)}</b></span></div>
-        </section>
-        <section className="panel settings-panel backup-panel">
-          <div className="panel-heading"><div><p className="panel-kicker">Приватное хранилище</p><h2>Резервные копии</h2></div><button className="secondary-button" disabled={busy !== null} onClick={() => void perform("backup", createBackup, "Новый бэкап отправлен в приватный репозиторий", false).then(loadBackups)}>{busy === "backup" ? "Создаём…" : "Создать"}</button></div>
-          {backupError ? <div className="backup-error">{backupError}</div> : backups.length ? <><div className="backup-list">{backups.slice(0, 6).map((backup) => <label className={selectedBackup === backup.name ? "selected" : ""} key={backup.name}><input type="radio" name="backup" value={backup.name} checked={selectedBackup === backup.name} onChange={() => setSelectedBackup(backup.name)} /><span><strong>{backup.created_at ? formatDate(backup.created_at.slice(0, 10)) : backup.name}</strong><small>{backup.name} · {formatBytes(backup.size_bytes)}</small></span></label>)}</div><button className="danger-button" disabled={!selectedBackup || busy !== null} onClick={() => void doRestore()}>{busy === "restore" ? "Восстанавливаем…" : "Восстановить выбранную копию"}</button></> : <div className="empty-state compact"><strong>Резервных копий пока нет</strong><p>Создайте первую копию в приватном репозитории.</p></div>}
-        </section>
-      </div>
-    </>
-  );
+export function DataPage({status,onChanged}:{status:PortfolioStatus;onChanged:()=>Promise<void>}) {
+  const [busy,setBusy]=useState<string|null>(null),[message,setMessage]=useState<{text:string;error?:boolean}|null>(null),[backups,setBackups]=useState<BackupItem[]>([]),[backupError,setBackupError]=useState<string|null>(null),[selectedBackup,setSelectedBackup]=useState("");
+  const loadBackups=useCallback(async()=>{try{const result=await getBackups();setBackups(result.items);setSelectedBackup(value=>value||result.items[0]?.name||"");setBackupError(null)}catch(error){setBackupError(error instanceof Error?error.message:"Не удалось загрузить бэкапы")}},[]);
+  useEffect(()=>{void loadBackups()},[loadBackups]);
+  const perform=async(key:string,task:()=>Promise<unknown>,success:string,refresh=true)=>{setBusy(key);setMessage(null);try{await task();setMessage({text:success});if(refresh)await onChanged()}catch(error){setMessage({text:error instanceof Error?error.message:"Операция не выполнена",error:true})}finally{setBusy(null)}};
+  const trackingSubmit=(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();const data=new FormData(event.currentTarget);const date=String(data.get("start_date"));if(!window.confirm(`Изменить начало учёта на ${date}? Перед очисткой старых импортов будет создан бэкап.`))return;void perform("tracking",()=>mutate("/settings/tracking-start",{start_date:date,confirm:true}),"Дата начала учёта обновлена")};
+  const fxSubmit=(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();const data=new FormData(event.currentTarget);void perform("fx",()=>runAction(`/fetch/fx?source=${data.get("source")}`),"Курсы валют обновлены")};
+  const doRestore=async()=>{if(!selectedBackup||!window.confirm(`Восстановить базу из ${selectedBackup}? Текущая база будет сохранена отдельно.`))return;setBusy("restore");setMessage(null);try{await restoreBackup(selectedBackup);window.location.reload()}catch(error){setMessage({text:error instanceof Error?error.message:"Не удалось восстановить базу",error:true});setBusy(null)}};
+  return <>
+    <PageHeading eyebrow="Управление" title="Данные и сервис" subtitle="Синхронизация, курсы, снимки, экспорт и резервные копии — без технической свалки"/>
+    {message&&<Alert mb="md" color={message.error?"red":"teal"} icon={message.error?<IconAlertTriangle size={18}/>:<IconCircleCheck size={18}/>} radius="lg">{message.text}</Alert>}
+    <SimpleGrid cols={{base:1,md:3}} spacing="md" mb="md">
+      <ServiceCard icon={IconArrowsExchange} color={status.tinvest.configured?"indigo":"gray"} title="T‑Invest" text={status.tinvest.configured?"Read-only подключение настроено":"Токен не настроен"} badge={status.tinvest.configured?"Подключено":"Отключено"}><Group><Button leftSection={<IconRefresh size={16}/>} disabled={!status.tinvest.configured||busy!==null} loading={busy==="sync"} onClick={()=>void perform("sync",()=>runAction("/sync/tinvest?days=3650"),"Операции и цены синхронизированы")}>Импортировать всё</Button><Button variant="default" disabled={!status.tinvest.configured||busy!==null} onClick={()=>void perform("prices",()=>runAction("/fetch/prices"),"Цены обновлены")}>Только цены</Button></Group></ServiceCard>
+      <ServiceCard icon={IconCamera} color="teal" title="Снимок портфеля" text={`${status.data.snapshots} сохранённых точек истории`} badge="Локально"><Group><Button color="teal" leftSection={<IconCamera size={16}/>} loading={busy==="snapshot"} disabled={busy!==null} onClick={()=>void perform("snapshot",()=>runAction("/snapshot"),"Снимок портфеля создан")}>Создать снимок</Button><Button component="a" href="/api/export/excel" variant="default" leftSection={<IconFileSpreadsheet size={16}/>}>Excel</Button></Group></ServiceCard>
+      <ServiceCard icon={IconCloudDownload} color="blue" title="Курсы валют" text={`Источник: ${sourceName(status.fx_source)}`} badge="Активно"><form className="inline-form" onSubmit={fxSubmit}><SelectField label="Источник" name="source" defaultValue={status.fx_source}><option value="cbr">ЦБ РФ</option><option value="bank_buy">Банк покупает</option><option value="bank_sell">Банк продаёт</option></SelectField><SubmitButton busy={busy==="fx"}>Обновить</SubmitButton></form></ServiceCard>
+    </SimpleGrid>
+    <div className="data-modern-grid">
+      <Paper withBorder radius="xl" p="xl"><Group justify="space-between" align="flex-start"><div><Text className="section-kicker">Граница истории</Text><Title order={3}>Начало учёта</Title></div><ThemeIcon variant="light" color="indigo" size={40} radius="md"><IconDatabaseExport size={20}/></ThemeIcon></Group><Text c="dimmed" size="sm" lh={1.6} mt="md">Операции T‑Invest до выбранной даты будут исключены. Ручные активы сохранятся, перед изменением создастся резервная копия.</Text><form className="single-form" onSubmit={trackingSubmit}><Field label="Учитывать портфель начиная с" name="start_date" type="date" defaultValue={status.tracking_start_date??""} required/><SubmitButton busy={busy==="tracking"}>Применить дату</SubmitButton></form><Stack gap={0} mt="xl"><Job label="Автоснимки" value={jobLabel(status.background_jobs_minutes.snapshots)}/><Job label="Цены T‑Invest" value={jobLabel(status.background_jobs_minutes.tinvest_prices)}/><Job label="Курсы валют" value={jobLabel(status.background_jobs_minutes.currency_rates)}/></Stack></Paper>
+      <Paper withBorder radius="xl" p="xl"><Group justify="space-between" align="flex-start"><div><Text className="section-kicker">Приватное хранилище</Text><Title order={3}>Резервные копии</Title></div><Button variant="light" leftSection={<IconShieldLock size={16}/>} loading={busy==="backup"} disabled={busy!==null} onClick={()=>void perform("backup",createBackup,"Новый бэкап отправлен в приватный репозиторий",false).then(loadBackups)}>Создать</Button></Group><Alert color="blue" variant="light" radius="md" mt="md" icon={<IconShieldLock size={17}/>}>Копии содержат полную базу портфеля и должны храниться только в приватном репозитории.</Alert>{backupError?<Alert color="red" mt="md">{backupError}</Alert>:backups.length?<><Radio.Group value={selectedBackup} onChange={setSelectedBackup} mt="lg"><Stack gap="xs">{backups.slice(0,6).map(backup=><Paper key={backup.name} withBorder radius="md" p="sm" className={selectedBackup===backup.name?"backup-modern selected":"backup-modern"}><Radio value={backup.name} label={<div><Text size="sm" fw={700}>{backup.created_at?formatDate(backup.created_at.slice(0,10)):backup.name}</Text><Text size="xs" c="dimmed">{backup.name} · {formatBytes(backup.size_bytes)}</Text></div>}/></Paper>)}</Stack></Radio.Group><Button mt="lg" color="red" variant="light" leftSection={<IconRestore size={16}/>} disabled={!selectedBackup||busy!==null} loading={busy==="restore"} onClick={()=>void doRestore()}>Восстановить выбранную копию</Button></>:<Text c="dimmed" size="sm" ta="center" py={50}>Резервных копий пока нет</Text>}</Paper>
+    </div>
+  </>;
 }
-
-function ServiceCard({ icon, title, text, tone, children }: { icon: string; title: string; text: string; tone: string; children: ReactNode }) { return <article className="service-card"><span className={`service-icon ${tone}`}>{icon}</span><div><h2>{title}</h2><p>{text}</p></div><div className="service-actions">{children}</div></article>; }
-function sourceName(source: string) { return ({ cbr: "ЦБ РФ", bank_buy: "банк покупает", bank_sell: "банк продаёт" } as Record<string, string>)[source] || source; }
-function jobLabel(minutes: number) { return minutes ? `каждые ${minutes} мин.` : "выключено"; }
-function formatBytes(bytes: number) { return `${(bytes / 1024 / 1024).toFixed(1)} МБ`; }
+function ServiceCard({icon:Icon,color,title,text,badge,children}:{icon:typeof IconCamera;color:string;title:string;text:string;badge:string;children:ReactNode}){return <Paper withBorder radius="xl" p="xl" className="service-modern"><Group justify="space-between"><ThemeIcon variant="light" color={color} size={46} radius="lg"><Icon size={22}/></ThemeIcon><Badge color={color} variant="light">{badge}</Badge></Group><Title order={3} mt="lg">{title}</Title><Text c="dimmed" size="sm" mt={6}>{text}</Text><div className="service-modern-actions">{children}</div></Paper>}
+function Job({label,value}:{label:string;value:string}){return <Group className="job-modern" justify="space-between"><Text size="sm" c="dimmed">{label}</Text><Text size="sm" fw={700}>{value}</Text></Group>}
+function sourceName(source:string){return({cbr:"ЦБ РФ",bank_buy:"банк покупает",bank_sell:"банк продаёт"}as Record<string,string>)[source]||source}function jobLabel(minutes:number){return minutes?`каждые ${minutes} мин.`:"выключено"}function formatBytes(bytes:number){return`${(bytes/1024/1024).toFixed(1)} МБ`}

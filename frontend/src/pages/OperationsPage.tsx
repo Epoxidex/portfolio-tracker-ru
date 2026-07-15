@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Alert, Badge, Button, Group, Paper, SegmentedControl, SimpleGrid, Stack, Text, ThemeIcon, Title } from "@mantine/core";
+import { IconAlertTriangle, IconBuildingBank, IconCash, IconCircleCheck, IconCoins, IconPigMoney } from "@tabler/icons-react";
 import { getCash, getReconciliations, getTransactions, mutate, requestId, type CashBalance, type Reconciliation, type Transaction } from "../api/actions";
 import { Field, SelectField, SubmitButton } from "../components/FormFields";
 import { PageHeading } from "../components/PageHeading";
@@ -35,26 +37,28 @@ export function OperationsPage({ revision, onChanged }: { revision: number; onCh
 
   return (
     <>
-      <PageHeading eyebrow="Журнал" title="Операции" subtitle="Ручные деньги, вклады, валюта и бумаги — с обновлением стоимости и прибыли" />
-      {notice && <div className={`notice ${notice.error ? "error" : "success"}`}>{notice.text}</div>}
-      <section className="cash-strip">
-        <CashMetric label="Всего RUB" value={cash.total} /><CashMetric label="Ручные RUB" value={cash.manual} /><CashMetric label="У брокера" value={cash.broker} />
-        <span className="cash-note">Ручные покупки расходуют только ручную часть RUB</span>
-      </section>
-      {reconciliations.length > 0 && <section className="reconciliation-panel"><div><p className="panel-kicker">Требует внимания</p><h2>Завершившиеся активы</h2></div>{reconciliations.map((item) => <article key={item.instrument_id}><span><strong>{item.name}</strong><small>Срок: {formatDate(item.maturity_date)} · {item.kind === "deposit" ? "нужно зачислить выплату" : "нужна синхронизация"}</small></span>{item.kind === "deposit" && <button className="secondary-button" disabled={busy} onClick={() => void settle(item)}>Зачислить {formatMoney(item.estimated_payout_rub ?? 0)}</button>}</article>)}</section>}
+      <PageHeading eyebrow="Журнал" title="Операции" subtitle="Движение денег, вклады, валюта и бумаги — с прозрачным влиянием на портфель" />
+      {notice && <Alert mb="md" color={notice.error ? "red" : "teal"} icon={notice.error ? <IconAlertTriangle size={18}/> : <IconCircleCheck size={18}/>} radius="lg">{notice.text}</Alert>}
+      <SimpleGrid cols={{base:1,xs:3}} spacing="md" mb="md">
+        <CashMetric label="Всего RUB" value={cash.total} icon={IconCash} color="indigo" />
+        <CashMetric label="Ручные RUB" value={cash.manual} icon={IconCoins} color="teal" />
+        <CashMetric label="У брокера" value={cash.broker} icon={IconBuildingBank} color="blue" />
+      </SimpleGrid>
+      <Alert mb="md" color="gray" variant="light" radius="lg" icon={<IconCash size={18}/>}>Ручные покупки расходуют только ручную часть RUB. Баланс брокера меняется после синхронизации T‑Invest.</Alert>
+      {reconciliations.length > 0 && <Paper withBorder radius="lg" p="lg" mb="md" className="attention-card"><Group mb="sm"><ThemeIcon color="orange" variant="light"><IconAlertTriangle size={18}/></ThemeIcon><div><Text className="section-kicker">Требует внимания</Text><Title order={3}>Завершившиеся активы</Title></div></Group><Stack gap={0}>{reconciliations.map(item=><Group className="reconciliation-row" key={item.instrument_id} justify="space-between"><div><Text size="sm" fw={700}>{item.name}</Text><Text size="xs" c="dimmed">Срок: {formatDate(item.maturity_date)} · {item.kind==="deposit"?"нужно зачислить выплату":"нужна синхронизация"}</Text></div>{item.kind==="deposit"&&<Button variant="light" color="orange" disabled={busy} onClick={()=>void settle(item)}>Зачислить {formatMoney(item.estimated_payout_rub??0)}</Button>}</Group>)}</Stack></Paper>}
       <div className="operations-layout">
-        <section className="panel operation-compose">
-          <div className="panel-heading"><div><p className="panel-kicker">Новая запись</p><h2>Добавить операцию</h2></div></div>
-          <div className="action-picker">{(["cash", "deposit", "currency", "security"] as ActionKind[]).map((item) => <button className={action === item ? "active" : ""} key={item} onClick={() => setAction(item)}>{({ cash: "RUB", deposit: "Вклад", currency: "Валюта", security: "Бумаги" })[item]}</button>)}</div>
+        <Paper withBorder radius="xl" p={{base:"md",md:"xl"}}>
+          <Text className="section-kicker">Новая запись</Text><Title order={3}>Добавить операцию</Title>
+          <SegmentedControl fullWidth mt="lg" mb="xl" value={action} onChange={value=>setAction(value as ActionKind)} data={[{value:"cash",label:"RUB"},{value:"deposit",label:"Вклад"},{value:"currency",label:"Валюта"},{value:"security",label:"Бумаги"}]}/>
           {action === "cash" && <CashForm busy={busy} perform={perform} />}
           {action === "deposit" && <DepositForm busy={busy} perform={perform} />}
           {action === "currency" && <CurrencyForm busy={busy} perform={perform} />}
           {action === "security" && <SecurityForm busy={busy} perform={perform} />}
-        </section>
-        <section className="panel transaction-panel">
-          <div className="panel-heading"><div><p className="panel-kicker">Последние записи</p><h2>История операций</h2></div><span className="panel-meta">{transactions.length}</span></div>
-          <div className="transaction-list">{transactions.length ? transactions.slice(0, 80).map((tx) => <article key={tx.id}><time>{formatDate(tx.date)}</time><span><strong>{tx.ticker || tx.instrument || transactionName(tx.kind)}</strong><small>{transactionName(tx.kind)}{tx.quantity ? ` · ${Math.abs(tx.quantity).toLocaleString("ru-RU")}` : ""}</small></span><b className={tx.amount >= 0 ? "positive" : "negative"}>{formatMoney(tx.amount, true)}</b></article>) : <div className="empty-state compact"><strong>Операций пока нет</strong></div>}</div>
-        </section>
+        </Paper>
+        <Paper withBorder radius="xl" p={{base:"md",md:"xl"}}>
+          <Group justify="space-between"><div><Text className="section-kicker">Последние записи</Text><Title order={3}>История операций</Title></div><Badge variant="light">{transactions.length}</Badge></Group>
+          <Stack gap={0} mt="lg" className="transaction-modern-list">{transactions.length?transactions.slice(0,80).map(tx=><Group className="transaction-modern-row" key={tx.id} justify="space-between" wrap="nowrap"><Group wrap="nowrap"><div className={`transaction-icon ${tx.amount>=0?"in":"out"}`}>{tx.amount>=0?"+":"−"}</div><div><Text size="sm" fw={700}>{tx.ticker||tx.instrument||transactionName(tx.kind)}</Text><Text size="xs" c="dimmed">{formatDate(tx.date)} · {transactionName(tx.kind)}{tx.quantity?` · ${Math.abs(tx.quantity).toLocaleString("ru-RU")}`:""}</Text></div></Group><Text size="sm" fw={750} c={tx.amount>=0?"teal.7":"red.6"}>{formatMoney(tx.amount,true)}</Text></Group>):<Text c="dimmed" ta="center" py={60}>Операций пока нет</Text>}</Stack>
+        </Paper>
       </div>
     </>
   );
@@ -82,5 +86,5 @@ function SecurityForm({ busy, perform }: { busy: boolean; perform: Perform }) {
   return <form className="operation-form" onSubmit={submit}><SelectField label="Действие" name="side"><option value="buy">Купить</option><option value="sell">Продать</option></SelectField><Field label="Тикер, ISIN или название" name="instrument" required /><Field label="Количество" name="quantity" type="number" min="0.0001" step="any" required /><Field label="Итого, ₽" name="total" type="number" min="0.01" step="0.01" required /><Field label="Комиссия, ₽" name="commission" type="number" min="0" step="0.01" defaultValue="0" /><Field label="Дата сделки" name="date" type="date" defaultValue={today} required /><Field label="Комментарий" name="note" maxLength={200} /><SubmitButton busy={busy}>Записать бумагу</SubmitButton></form>;
 }
 
-function CashMetric({ label, value }: { label: string; value: number }) { return <div><span>{label}</span><strong>{formatMoney(value)}</strong></div>; }
+function CashMetric({ label, value, icon: Icon, color }: { label: string; value: number; icon: typeof IconCash; color: string }) { return <Paper withBorder radius="lg" p="lg"><Group wrap="nowrap"><ThemeIcon size={42} radius="md" variant="light" color={color}><Icon size={20}/></ThemeIcon><div><Text size="xs" c="dimmed" fw={650}>{label}</Text><Text size="xl" fw={780}>{formatMoney(value)}</Text></div></Group></Paper>; }
 function transactionName(kind: string) { return ({ buy: "Покупка", sell: "Продажа", fx_buy: "Покупка валюты", fx_sell: "Продажа валюты", coupon: "Купон", dividend: "Дивиденд", interest: "Проценты", topup: "Пополнение", withdrawal: "Вывод" } as Record<string, string>)[kind] || kind; }

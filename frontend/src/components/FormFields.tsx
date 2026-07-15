@@ -1,13 +1,16 @@
+import { Button, NativeSelect, TextInput } from "@mantine/core";
 import type { InputHTMLAttributes, SelectHTMLAttributes } from "react";
 
-export function Field({ label, hint, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }) {
-  return <label className="form-field"><span>{label}</span><input {...props} />{hint && <small>{hint}</small>}</label>;
+type FieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "size" | "color"> & { label: string; hint?: string };
+export function Field({ label, hint, ...props }: FieldProps) {
+  return <TextInput label={label} description={hint} radius="md" {...props} />;
 }
 
-export function SelectField({ label, children, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { label: string }) {
-  return <label className="form-field"><span>{label}</span><select {...props}>{children}</select></label>;
+type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "size" | "color"> & { label: string };
+export function SelectField({ label, children, ...props }: SelectProps) {
+  return <NativeSelect label={label} radius="md" {...props}>{children}</NativeSelect>;
 }
 
 export function SubmitButton({ busy, children }: { busy: boolean; children: string }) {
-  return <button className="primary-button submit-button" type="submit" disabled={busy}>{busy ? "Выполняем…" : children}</button>;
+  return <Button className="submit-button" type="submit" loading={busy} radius="md">{children}</Button>;
 }
