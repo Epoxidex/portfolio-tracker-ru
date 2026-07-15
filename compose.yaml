@@ -1,0 +1,45 @@
+name: portfolio-tracker
+
+services:
+  portfolio:
+    image: portfolio-tracker-ru:local
+    build:
+      context: .
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      DB_PATH: /data/portfolio.db
+      TINVEST_TOKEN: ${TINVEST_TOKEN:-}
+      TINVEST_ACCOUNT_ID: ${TINVEST_ACCOUNT_ID:-}
+      TINVEST_SDK_ERROR_REPORTING: ${TINVEST_SDK_ERROR_REPORTING:-0}
+      SSL_TBANK_VERIFY: ${SSL_TBANK_VERIFY:-true}
+      PORTFOLIO_GOAL: ${PORTFOLIO_GOAL:-1000000}
+      PORTFOLIO_TRACKING_START_DATE: ${PORTFOLIO_TRACKING_START_DATE:-}
+      FX_RATE_SOURCE: ${FX_RATE_SOURCE:-cbr}
+      BANKIROS_URL: ${BANKIROS_URL:-https://bankiros.ru/bank/kamkombank/currency}
+      SNAPSHOT_EVERY_MIN: ${SNAPSHOT_EVERY_MIN:-60}
+      FETCH_EVERY_MIN: ${FETCH_EVERY_MIN:-0}
+      FX_EVERY_MIN: ${FX_EVERY_MIN:-0}
+      BACKUP_GIT_REPOSITORY: ${BACKUP_GIT_REPOSITORY:-}
+      BACKUP_GIT_BRANCH: ${BACKUP_GIT_BRANCH:-main}
+    ports:
+      - name: web
+        target: 8000
+        published: "${PORTFOLIO_PORT:-8000}"
+        host_ip: ${PORTFOLIO_BIND_ADDRESS:-127.0.0.1}
+        protocol: tcp
+        app_protocol: http
+    volumes:
+      - portfolio_data:/data
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m
+    stop_grace_period: 15s
+
+volumes:
+  portfolio_data:
+    name: ${PORTFOLIO_DATA_VOLUME:-portfolio-tracker-data}

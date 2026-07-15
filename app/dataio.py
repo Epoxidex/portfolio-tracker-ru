@@ -41,7 +41,7 @@ def backup_database(output_dir: str | Path | None = None, *, prefix: str = "port
         source = Path(DB_PATH)
         if not source.exists():
             raise FileNotFoundError(f"database does not exist: {source}")
-        directory = Path(output_dir) if output_dir else BASE_DIR / "backups"
+        directory = Path(output_dir) if output_dir else DB_PATH.parent / "backups"
         if not directory.is_absolute():
             directory = BASE_DIR / directory
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")

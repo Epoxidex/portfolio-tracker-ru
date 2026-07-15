@@ -75,6 +75,7 @@ if (
 ):
     raise ValueError("BACKUP_GIT_BRANCH contains unsupported characters")
 
-# Deliberately fixed under an ignored directory so a database can never be
-# staged in the public source repository because of a bad environment value.
-BACKUP_GIT_DIRECTORY = (BASE_DIR / "backups" / "git-vault").resolve()
+# Keep the Git backup checkout beside the private database. With the default
+# local DB this remains the ignored repository backups/ directory; in Docker it
+# lives on the persistent /data volume instead of the read-only image layer.
+BACKUP_GIT_DIRECTORY = (DB_PATH.parent / "backups" / "git-vault").resolve()

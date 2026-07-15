@@ -220,7 +220,11 @@ def build_parser():
     demo.set_defaults(func=cmd_demo)
 
     backup = sub.add_parser("backup", help="create a consistent SQLite backup")
-    backup.add_argument("--output", default="backups", help="output directory")
+    backup.add_argument(
+        "--output",
+        default=None,
+        help="output directory (default: backups beside the active database)",
+    )
     backup.set_defaults(func=cmd_backup)
 
     restore = sub.add_parser("restore", help="restore a SQLite backup")
@@ -265,7 +269,11 @@ def build_parser():
         action="store_true",
         help="create a backup, trim older imports, and update .env",
     )
-    tracking.add_argument("--backup-output", default="backups")
+    tracking.add_argument(
+        "--backup-output",
+        default=None,
+        help="backup directory (default: backups beside the active database)",
+    )
     tracking.set_defaults(func=cmd_tracking_start)
     sub.add_parser("snapshot").set_defaults(func=cmd_snapshot)
     sub.add_parser("fetch-prices").set_defaults(func=cmd_fetch_prices)

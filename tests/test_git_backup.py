@@ -5,9 +5,16 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import config
+from app.dataio import backup_database
 from app.db import SessionLocal
 from app.main import app
 from app.models import Instrument
+
+
+def test_default_backup_directory_follows_private_database(db):
+    backup = backup_database()
+    assert backup.parent == config.DB_PATH.parent / "backups"
+    assert backup.is_file()
 
 
 def _git(*args, cwd=None):
