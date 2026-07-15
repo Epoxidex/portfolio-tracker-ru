@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { getCash, getReconciliations, getTransactions, mutate, requestId, type CashBalance, type Reconciliation, type Transaction } from "../api/actions";
 import { Field, SelectField, SubmitButton } from "../components/FormFields";
 import { PageHeading } from "../components/PageHeading";
-import { formatDate, formatMoney } from "../lib/format";
+import { formatDate, formatMoney, todayInMoscow } from "../lib/format";
 
 type ActionKind = "cash" | "deposit" | "currency" | "security";
-const today = new Date().toISOString().slice(0, 10);
+const today = todayInMoscow();
 
 export function OperationsPage({ revision, onChanged }: { revision: number; onChanged: () => Promise<void> }) {
   const [cash, setCash] = useState<CashBalance>({ broker: 0, manual: 0, total: 0 });

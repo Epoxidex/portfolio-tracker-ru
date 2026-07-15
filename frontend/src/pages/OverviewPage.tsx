@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import type { PortfolioStatus, PortfolioSummary } from "../api/portfolio";
-import { getPositions, type Position } from "../api/dashboard";
+import { getPositions, getReturns, type Position, type ReturnsData } from "../api/dashboard";
 import { AllocationPanel } from "../components/AllocationPanel";
 import { GoalCard } from "../components/GoalCard";
 import { KpiGrid } from "../components/KpiGrid";
 import { PageHeading } from "../components/PageHeading";
 import { PositionsTable } from "../components/PositionsTable";
+import { PerformanceStrip } from "../components/PerformanceStrip";
 import { SystemStatus } from "../components/SystemStatus";
 import { formatDate } from "../lib/format";
 
@@ -18,9 +19,10 @@ type Props = {
 
 export function OverviewPage({ summary, status, revision, onNavigate }: Props) {
   const [positions, setPositions] = useState<Position[]>([]);
+  const [returns, setReturns] = useState<ReturnsData | null>(null);
 
   useEffect(() => {
-    void getPositions().then(setPositions);
+    void Promise.all([getPositions(), getReturns("daily")]).then(([nextPositions, nextReturns]) => { setPositions(nextPositions); setReturns(nextReturns); });
   }, [revision]);
 
   const empty = status.data.instruments === 0;
@@ -40,6 +42,7 @@ export function OverviewPage({ summary, status, revision, onNavigate }: Props) {
       )}
       <div className="dashboard-stack">
         <KpiGrid summary={summary} />
+        <PerformanceStrip values={[{ label: "Сегодня", delta: returns?.today }, { label: "Неделя", delta: returns?.week }, { label: "Месяц", delta: returns?.month }, { label: "С начала года", delta: returns?.ytd }]} />
         <div className="overview-grid">
           <GoalCard current={summary.value} goal={status.portfolio_goal} streak={summary.streak} />
           <AllocationPanel classes={summary.by_class} />

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getCalendar, getPassiveIncome, type CalendarEvent, type PassiveIncome } from "../api/dashboard";
 import { PageHeading } from "../components/PageHeading";
-import { formatDate, formatMoney } from "../lib/format";
+import { formatDate, formatMoney, todayInMoscow } from "../lib/format";
 
 const eventTone: Record<string, string> = { "Купон": "teal", "Проценты": "gold", "Дивиденд": "violet", "Погашение": "blue", "Возврат вклада": "blue" };
 
@@ -10,7 +10,7 @@ export function CalendarPage({ revision }: { revision: number }) {
   const [income, setIncome] = useState<PassiveIncome>({ annual: 0, monthly: 0, detail: [] });
   const [showPast, setShowPast] = useState(false);
   useEffect(() => { void Promise.all([getCalendar(), getPassiveIncome()]).then(([calendar, passive]) => { setEvents(calendar); setIncome(passive); }); }, [revision]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInMoscow();
   const visible = useMemo(() => events.filter((event) => showPast || event.date >= today), [events, showPast, today]);
   const groups = useMemo(() => Object.entries(visible.reduce<Record<string, CalendarEvent[]>>((acc, event) => { const key = event.date.slice(0, 7); (acc[key] ??= []).push(event); return acc; }, {})), [visible]);
   const upcoming = visible.filter((event) => event.date >= today).slice(0, 5).reduce((sum, event) => sum + event.amount, 0);

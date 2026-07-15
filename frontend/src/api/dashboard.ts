@@ -26,12 +26,13 @@ export type HistoryPoint = {
 };
 
 export type ReturnPoint = { label: string; pct: number; change: number };
+export type ReturnDelta = { pct: number | null; change: number | null };
 export type ReturnsData = {
   points: ReturnPoint[];
-  today?: ReturnPoint;
-  week?: ReturnPoint;
-  month?: ReturnPoint;
-  ytd?: ReturnPoint;
+  today?: ReturnDelta;
+  week?: ReturnDelta;
+  month?: ReturnDelta;
+  ytd?: ReturnDelta;
 };
 
 export type Leader = {
