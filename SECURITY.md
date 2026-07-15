@@ -17,6 +17,19 @@ python scripts/check_public.py
 
 Use only a **read-only** T-Invest token. The application does not need trading or transfer permissions.
 
+## MCP write access
+
+The local MCP server can change the ignored SQLite database through explicit
+ledger tools. Connect it only to a trusted local client. Write tools require
+`confirm=true` and an idempotency key, but those checks do not replace reviewing
+the concrete amounts, dates and asset identifiers before asking a model to apply
+them. Hypothetical questions must not trigger write tools.
+
+MCP cannot trade or transfer funds at T-Invest. Broker synchronization uses the
+same read-only token and only updates local data. Keep the server on `stdio`; do
+not wrap it in a remotely reachable transport without adding authentication and
+an explicit threat model.
+
 ## If a secret was committed
 
 1. Revoke the token immediately in T-Invest and issue a new read-only token.

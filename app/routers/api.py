@@ -3,13 +3,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from .. import config
 from ..db import get_db
-from ..models import Instrument, Transaction, PriceHistory, Snapshot
+from ..models import Instrument, Transaction
 from ..schemas import (
     TxIn, InstrumentIn, PriceIn, DepositIn, CurrencyHoldingIn, TrackingStartIn,
-    BackupRestoreIn,
+    BackupRestoreIn, CashLedgerIn, DepositOpenLedgerIn, DepositSettleLedgerIn,
+    CurrencyBuyLedgerIn, CurrencySellLedgerIn, SecurityBuyLedgerIn,
+    SecuritySellLedgerIn, LedgerBatchIn,
 )
-from ..dataio import backup_database
-from ..services import portfolio, calendar as cal, snapshots
+from ..dataio import DATABASE_MAINTENANCE_LOCK, backup_database
+from ..services import portfolio, calendar as cal, snapshots, read_model, ledger
 from ..services.onboarding import SetupConflict, add_currency_holding, create_deposit
 from ..services.tracking import apply_tracking_cleanup, update_env_setting
 from ..services.tinvest import fetch_prices
@@ -17,7 +19,6 @@ from ..services.banki import fetch_fx
 from ..services.operations import sync_operations
 from ..services.git_backup import (
     GitBackupError,
-    backup_status,
     create_repository_backup,
     list_repository_backups,
     restore_repository_backup,
@@ -43,24 +44,7 @@ def get_summary(db: Session = Depends(get_db)):
 @router.get("/status")
 def get_status(db: Session = Depends(get_db)):
     """Configuration and data readiness without exposing secrets or local paths."""
-    return {
-        "tinvest": {
-            "configured": bool(config.TINVEST_TOKEN),
-            "account_selected": bool(config.TINVEST_ACCOUNT_ID),
-        },
-        "fx_source": config.FX_RATE_SOURCE,
-        "portfolio_goal": config.PORTFOLIO_GOAL,
-        "tracking_start_date": (
-            config.PORTFOLIO_TRACKING_START_DATE.isoformat()
-            if config.PORTFOLIO_TRACKING_START_DATE else None
-        ),
-        "backups": backup_status(),
-        "data": {
-            "instruments": db.query(Instrument).count(),
-            "transactions": db.query(Transaction).count(),
-            "snapshots": db.query(Snapshot).count(),
-        },
-    }
+    return read_model.data_status(db)
 
 
 @router.get("/backups")
@@ -128,6 +112,103 @@ def get_income(db: Session = Depends(get_db)):
     return cal.passive_income(db)
 
 
+@router.get("/ledger/cash")
+def get_ledger_cash(db: Session = Depends(get_db)):
+    return ledger.rub_cash_balance(db)
+
+
+@router.get("/ledger/realized")
+def get_ledger_realized(db: Session = Depends(get_db)):
+    return portfolio.realized_results(db)
+
+
+@router.get("/ledger/reconciliations")
+def get_ledger_reconciliations(db: Session = Depends(get_db)):
+    return ledger.pending_reconciliations(db)
+
+
+def _ledger_payload(payload, action_type: str) -> tuple[str, bool, dict]:
+    data = payload.model_dump()
+    request_id = data.pop("request_id")
+    data.pop("confirm", None)
+    create_snapshot = data.pop("create_snapshot", True)
+    data["type"] = action_type
+    return request_id, create_snapshot, data
+
+
+def _apply_ledger(db: Session, request_id: str, actions: list[dict], create_snapshot: bool):
+    try:
+        with DATABASE_MAINTENANCE_LOCK:
+            return ledger.apply_actions(
+                db,
+                request_id=request_id,
+                actions=actions,
+                create_snapshot=create_snapshot,
+            )
+    except ledger.LedgerConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/ledger/cash/topup")
+def ledger_cash_topup(payload: CashLedgerIn, db: Session = Depends(get_db)):
+    request_id, create_snapshot, action = _ledger_payload(payload, "cash_topup")
+    return _apply_ledger(db, request_id, [action], create_snapshot)
+
+
+@router.post("/ledger/cash/withdrawal")
+def ledger_cash_withdrawal(payload: CashLedgerIn, db: Session = Depends(get_db)):
+    request_id, create_snapshot, action = _ledger_payload(payload, "cash_withdrawal")
+    return _apply_ledger(db, request_id, [action], create_snapshot)
+
+
+@router.post("/ledger/deposits/open")
+def ledger_open_deposit(payload: DepositOpenLedgerIn, db: Session = Depends(get_db)):
+    request_id, create_snapshot, action = _ledger_payload(payload, "open_deposit")
+    return _apply_ledger(db, request_id, [action], create_snapshot)
+
+
+@router.post("/ledger/deposits/settle")
+def ledger_settle_deposit(payload: DepositSettleLedgerIn, db: Session = Depends(get_db)):
+    request_id, create_snapshot, action = _ledger_payload(payload, "settle_deposit")
+    return _apply_ledger(db, request_id, [action], create_snapshot)
+
+
+@router.post("/ledger/currencies/buy")
+def ledger_buy_currency(payload: CurrencyBuyLedgerIn, db: Session = Depends(get_db)):
+    request_id, create_snapshot, action = _ledger_payload(payload, "buy_currency")
+    return _apply_ledger(db, request_id, [action], create_snapshot)
+
+
+@router.post("/ledger/currencies/sell")
+def ledger_sell_currency(payload: CurrencySellLedgerIn, db: Session = Depends(get_db)):
+    request_id, create_snapshot, action = _ledger_payload(payload, "sell_currency")
+    return _apply_ledger(db, request_id, [action], create_snapshot)
+
+
+@router.post("/ledger/securities/buy")
+def ledger_buy_security(payload: SecurityBuyLedgerIn, db: Session = Depends(get_db)):
+    request_id, create_snapshot, action = _ledger_payload(payload, "buy_security")
+    return _apply_ledger(db, request_id, [action], create_snapshot)
+
+
+@router.post("/ledger/securities/sell")
+def ledger_sell_security(payload: SecuritySellLedgerIn, db: Session = Depends(get_db)):
+    request_id, create_snapshot, action = _ledger_payload(payload, "sell_security")
+    return _apply_ledger(db, request_id, [action], create_snapshot)
+
+
+@router.post("/ledger/actions")
+def ledger_actions(payload: LedgerBatchIn, db: Session = Depends(get_db)):
+    return _apply_ledger(
+        db,
+        payload.request_id,
+        payload.model_dump()["actions"],
+        payload.create_snapshot,
+    )
+
+
 @router.get("/history")
 def get_history(db: Session = Depends(get_db)):
     return snapshots.history(db)
@@ -135,10 +216,7 @@ def get_history(db: Session = Depends(get_db)):
 
 @router.get("/instruments")
 def list_instruments(db: Session = Depends(get_db)):
-    return [{"id": i.id, "kind": i.kind, "name": i.name, "ticker": i.ticker,
-             "isin": i.isin, "figi": i.figi, "currency": i.currency,
-             "last_price": i.last_price, "nkd": i.nkd, "meta": i.meta} for i in
-            db.query(Instrument).all()]
+    return read_model.list_instruments(db, limit=2000)["items"]
 
 
 @router.post("/instruments")
@@ -191,11 +269,7 @@ def del_transaction(tx_id: int, db: Session = Depends(get_db)):
 
 @router.get("/transactions")
 def list_transactions(db: Session = Depends(get_db)):
-    return [{"id": t.id, "ts": t.ts.isoformat(),
-             "instrument": t.instrument.name if t.instrument else None,
-             "kind": t.kind, "quantity": t.quantity, "price": t.price,
-             "amount": t.amount, "commission": t.commission, "note": t.note}
-            for t in db.query(Transaction).order_by(Transaction.ts).all()]
+    return read_model.list_transactions(db, descending=False, limit=2000)["items"]
 
 
 @router.post("/price")
@@ -233,23 +307,7 @@ def do_fetch_fx(
 @router.get("/prices/history")
 def get_price_history(days: int = Query(default=90), db: Session = Depends(get_db)):
     """История цен всех инструментов за последние N дней."""
-    from datetime import datetime, timedelta
-    since = datetime.utcnow() - timedelta(days=days)
-    insts = db.query(Instrument).all()
-    result = []
-    for inst in insts:
-        rows = (db.query(PriceHistory)
-                .filter(PriceHistory.instrument_id == inst.id,
-                        PriceHistory.ts >= since)
-                .order_by(PriceHistory.ts)
-                .all())
-        if rows:
-            result.append({
-                "id": inst.id, "name": inst.name, "kind": inst.kind,
-                "currency": inst.currency,
-                "history": [{"ts": r.ts.isoformat(), "price": r.price} for r in rows],
-            })
-    return result
+    return read_model.price_history(db, days=days, limit_per_instrument=10000)["items"]
 
 
 @router.post("/sync/operations")

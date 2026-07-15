@@ -353,14 +353,22 @@ def _sync_rub_balance(client, portfolio_positions, db, acc_id):
         Instrument.figi == "RUB000UTSTOM"
     ).first()
     if not rub_inst:
+        rub_inst = db.query(Instrument).filter(
+            Instrument.kind == "currency", Instrument.currency == "RUB"
+        ).order_by(Instrument.id).first()
+    if not rub_inst:
         rub_inst = Instrument(
             kind="currency", name="Рубли (RUB)", currency="RUB",
-            figi="RUB000UTSTOM", last_price=1.0, meta={"balance": balance},
+            ticker="RUB", figi="RUB000UTSTOM", last_price=1.0,
+            meta={"balance": balance, "broker_balance": balance},
         )
         db.add(rub_inst)
         print(f"  Created: Рубли (RUB), balance={balance}")
     else:
         meta = dict(rub_inst.meta or {})
         meta["balance"] = balance
+        meta["broker_balance"] = balance
         rub_inst.meta = meta
+        rub_inst.figi = "RUB000UTSTOM"
+        rub_inst.ticker = rub_inst.ticker or "RUB"
     db.commit()

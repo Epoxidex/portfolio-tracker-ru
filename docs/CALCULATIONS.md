@@ -8,7 +8,23 @@ This application is a personal dashboard, not a broker report or accounting syst
 - Bond value includes the current clean price plus accrued coupon income (НКД).
 - Current P&L is unrealized P&L plus recorded coupons/dividends and realized P&L for positions that remain open.
 - Fully closed positions are not shown in the active positions table. This means the dashboard is primarily a view of the current portfolio, not a lifetime tax ledger.
+- `lifetime_results` separately retains recorded coupons, dividends, deposit interest and moving-average realized P&L for closed as well as active assets. It is still an estimate when imported broker history starts after the true acquisition date.
 - XIRR is calculated from instrument cash flows and the current terminal value of invested assets. Ruble cash from T-Invest is excluded from the terminal value to avoid counting sale proceeds twice. Treat XIRR as an estimate, especially when the imported operation history is incomplete.
+
+## Ruble cash and internal transfers
+
+RUB is split into two components: the broker-authoritative T-Invest balance and
+the manual local cash ledger. The displayed RUB position is their sum, but a
+manual bank deposit, currency purchase or manual security purchase can spend
+only manual RUB. This prevents a local operation from pretending that money was
+withdrawn from the broker when T-Invest still reports it there.
+
+Manual `topup` and `withdrawal` rows are audit entries for the RUB balance.
+Transfers between RUB and another asset create matching rows on both sides. For
+example, buying USD subtracts the all-in RUB cost and creates `fx_buy`; selling
+USD creates `fx_sell` and adds the net factual proceeds to RUB. RUB ledger rows
+are excluded from XIRR and period-leader calculations so an internal transfer
+does not look like investment performance.
 
 ## Day, week and month changes
 
@@ -37,7 +53,22 @@ New deposits store the annual rate as a decimal internally, while the UI accepts
 
 The estimate is before taxes. Banks may use a different day-count convention, rounding rule, changing rate or early-termination rule; compare the result with the deposit agreement.
 
-After the maturity date, a deposit remains in the current portfolio at its capped estimated closing value and is marked for reconciliation. The application does not assume that the bank automatically transferred the money into another tracked asset. Editing/closing a matured deposit against the factual bank payout is still a known workflow gap.
+After the maturity date, a deposit remains in the current portfolio at its capped
+estimated closing value and is reported by `pending_reconciliations`. Settlement
+is explicit because the bank can round differently, withhold tax or apply an
+early-termination rule. Settling records return of principal and the difference
+between principal and actual payout, closes the deposit, and credits manual RUB.
+For a normal maturity the user may explicitly accept the estimate; an early
+closure always requires the factual payout.
+
+## Securities and T-Invest lifecycle
+
+T-Invest securities are broker-authoritative. Manual ledger tools reject their
+buys and sells. After a broker trade or bond repayment, synchronization imports
+the supported operation, reconciles the current quantity and cost data, updates
+the broker RUB balance and takes a snapshot. Bond repayment is represented as a
+sale for the repaid amount. Securities that are genuinely tracked outside
+T-Invest can use the manual buy/sell ledger and the same moving-average cost rule.
 
 ## Data-source limitations
 

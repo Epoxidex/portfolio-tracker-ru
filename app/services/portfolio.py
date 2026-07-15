@@ -146,6 +146,8 @@ def positions(db, on=None):
         txs = inst.transactions
 
         if inst.kind == "deposit":
+            if (inst.meta or {}).get("status") == "closed":
+                continue
             invested = sum(-t.amount for t in txs if t.kind == "buy")
             # A maturity date does not prove that money moved elsewhere. Keep a
             # matured deposit at its capped close-date value until the user
@@ -157,9 +159,18 @@ def positions(db, on=None):
             continue
 
         if inst.kind == "currency":
-            # Рубли (RUB): баланс берём напрямую из meta.balance (обновляется из T-Invest)
+            # RUB combines the broker-authoritative balance with the local cash ledger.
             if inst.currency == "RUB":
-                balance = float((inst.meta or {}).get("balance", 0))
+                meta = inst.meta or {}
+                broker_balance = float(
+                    meta.get("broker_balance", meta.get("balance", 0)) or 0
+                )
+                manual_balance = sum(
+                    float(tx.amount or 0)
+                    for tx in txs
+                    if tx.kind in {"topup", "withdrawal"}
+                )
+                balance = broker_balance + manual_balance
                 if balance <= 0:
                     continue
                 out.append(_pos(inst, qty=round(balance, 2), invested=0,
@@ -243,6 +254,8 @@ def summary(db, on=None):
 
     flows = []
     for t in db.query(Transaction).filter(Transaction.instrument_id.isnot(None)).all():
+        if t.instrument and t.instrument.kind == "currency" and t.instrument.currency == "RUB":
+            continue
         if t.amount:
             flows.append((t.ts, t.amount))
     # Ruble cash is excluded from the terminal XIRR value: security sales are
@@ -262,6 +275,7 @@ def summary(db, on=None):
         c["pnl_pct"] = round(c["pnl_pct"], 4)
     from .snapshots import compute_streak
     streak = compute_streak(db)
+    lifetime = realized_results(db)
     return {
         "as_of": on.isoformat(),
         "invested": round(tot["invested"], 2),
@@ -271,6 +285,57 @@ def summary(db, on=None):
         "income_received": round(tot["income"], 2),
         "xirr": round(r, 4) if r is not None else None,
         "streak": streak,
+        "lifetime_results": lifetime,
         "by_class": dict(by_class),
         "positions": pos,
+    }
+
+
+def realized_results(db):
+    """Recorded lifetime income and moving-average realized P&L.
+
+    This is deliberately separate from headline current-position P&L. Imported
+    broker history may be incomplete before the configured tracking boundary.
+    """
+    items = []
+    realized_total = 0.0
+    income_total = 0.0
+    for inst in db.query(Instrument).all():
+        if inst.kind == "currency" and inst.currency == "RUB":
+            continue
+        txs = list(inst.transactions)
+        if inst.kind == "currency":
+            quantity, _, realized = _moving_average_book(txs, "fx_buy", "fx_sell")
+            income = 0.0
+        elif inst.kind in {"bond", "share", "etf"}:
+            quantity, _, realized = _moving_average_book(txs, "buy", "sell")
+            income = sum(float(tx.amount or 0) for tx in txs if tx.kind in {"coupon", "dividend"})
+        elif inst.kind == "deposit":
+            quantity = 0.0 if (inst.meta or {}).get("status") == "closed" else 1.0
+            realized = 0.0
+            income = sum(float(tx.amount or 0) for tx in txs if tx.kind == "interest")
+        else:
+            continue
+        if not realized and not income:
+            continue
+        realized_total += realized
+        income_total += income
+        items.append({
+            "id": inst.id,
+            "name": inst.name,
+            "ticker": inst.ticker,
+            "kind": inst.kind,
+            "closed": quantity <= 1e-9,
+            "realized_pnl": round(realized, 2),
+            "income": round(income, 2),
+            "total_result": round(realized + income, 2),
+        })
+    items.sort(key=lambda item: abs(item["total_result"]), reverse=True)
+    return {
+        "realized_pnl": round(realized_total, 2),
+        "income": round(income_total, 2),
+        "total": round(realized_total + income_total, 2),
+        "items": items,
+        "estimate": True,
+        "limitation": "T-Invest results can be incomplete before the tracking start date",
     }
