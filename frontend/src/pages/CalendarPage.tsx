@@ -68,14 +68,14 @@ export function CalendarPage({ revision }: { revision: number }) {
   const monthTotal = monthEvents.reduce((sum, event) => sum + event.amount, 0);
 
   const changeView = (next: string) => { setView(next); calendarRef.current?.getApi().changeView(next); };
-  const datesSet = (arg: DatesSetArg) => { setTitle(arg.view.title); setRange({ start: arg.startStr.slice(0, 10), end: arg.endStr.slice(0, 10) }); };
+  const datesSet = (arg: DatesSetArg) => { setTitle(arg.view.title); setRange({ start: toLocalDate(arg.view.currentStart), end: toLocalDate(arg.view.currentEnd) }); };
   const eventClick = (arg: EventClickArg) => setSelected(arg.event.extendedProps.source as CalendarEvent);
 
   return <>
     <PageHeading eyebrow="Денежный поток" title="Календарь выплат" subtitle="Купоны, дивиденды, проценты, возвраты вкладов и погашения — в одной временной картине" actions={<Switch checked={showPast} onChange={event => setShowPast(event.currentTarget.checked)} label="Показывать прошедшие"/>}/>
 
     <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" mb="md">
-      <SummaryCard icon={IconCalendarEvent} color="indigo" label="В этом месяце" value={formatMoney(monthTotal)} detail={`${monthEvents.length} событий`} />
+      <SummaryCard icon={IconCalendarEvent} color="indigo" label="В этом месяце" value={formatMoney(monthTotal)} detail={`${monthEvents.length} ${eventWord(monthEvents.length)}`} />
       <SummaryCard icon={IconCash} color="teal" label="Средний пассивный доход" value={formatMoney(income.monthly)} detail="в месяц" />
       <SummaryCard icon={IconTrendingUp} color="violet" label="Ожидается за год" value={formatMoney(income.annual)} detail="до налогов" />
     </SimpleGrid>
@@ -140,3 +140,5 @@ function SummaryCard({icon:Icon,color,label,value,detail}:{icon:typeof IconCash;
 function UpcomingEvent({event,onClick}:{event:CalendarEvent;onClick:()=>void}) { const style=TYPE_STYLE[event.type]||fallback; const Icon=style.icon; return <button className="upcoming-event" type="button" onClick={onClick}><ThemeIcon variant="light" color={style.color} radius="md"><Icon size={17}/></ThemeIcon><span><Text size="sm" fw={700} lineClamp={1}>{event.instrument}</Text><Text size="xs" c="dimmed">{formatDate(event.date)} · {event.type}</Text></span><span><Text size="sm" fw={750}>{formatMoney(event.amount)}</Text><IconChevronRight size={15}/></span></button>; }
 function EventDetails({event}:{event:CalendarEvent}) { const style=TYPE_STYLE[event.type]||fallback; const Icon=style.icon; return <Stack gap="xl"><Paper radius="xl" p="xl" style={{background:style.soft}}><ThemeIcon color={style.color} variant="filled" size={48} radius="lg"><Icon size={23}/></ThemeIcon><Text c={style.color} size="sm" fw={750} mt="lg">{event.type}</Text><Title order={2} mt={4}>{event.instrument}</Title><Text className="drawer-amount" mt="xl">{formatMoney(event.amount)}</Text></Paper><Stack gap="md"><DetailRow label="Дата выплаты" value={formatDate(event.date)}/><DetailRow label="Инструмент" value={event.ticker||event.instrument}/><DetailRow label="Тип события" value={event.type}/></Stack><Text size="xs" c="dimmed" lh={1.6}>Будущие события являются прогнозом. Фактическое зачисление отражается отдельной операцией или после синхронизации с брокером.</Text></Stack>; }
 function DetailRow({label,value}:{label:string;value:string}) { return <Group justify="space-between" wrap="nowrap"><Text size="sm" c="dimmed">{label}</Text><Text size="sm" fw={700} ta="right">{value}</Text></Group>; }
+function toLocalDate(value: Date) { return `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,"0")}-${String(value.getDate()).padStart(2,"0")}`; }
+function eventWord(value: number) { const mod100=value%100,mod10=value%10; if(mod100>=11&&mod100<=14)return"событий"; if(mod10===1)return"событие"; if(mod10>=2&&mod10<=4)return"события"; return"событий"; }

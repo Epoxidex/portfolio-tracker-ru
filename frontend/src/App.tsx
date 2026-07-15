@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import {
   ActionIcon,
   Alert,
@@ -33,11 +33,12 @@ import {
   type PortfolioStatus,
   type PortfolioSummary,
 } from "./api/portfolio";
-import { AnalyticsPage } from "./pages/AnalyticsPage";
-import { CalendarPage } from "./pages/CalendarPage";
-import { DataPage } from "./pages/DataPage";
 import { OverviewPage } from "./pages/OverviewPage";
-import { OperationsPage } from "./pages/OperationsPage";
+
+const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage").then(module => ({ default: module.AnalyticsPage })));
+const CalendarPage = lazy(() => import("./pages/CalendarPage").then(module => ({ default: module.CalendarPage })));
+const OperationsPage = lazy(() => import("./pages/OperationsPage").then(module => ({ default: module.OperationsPage })));
+const DataPage = lazy(() => import("./pages/DataPage").then(module => ({ default: module.DataPage })));
 
 type OverviewState = { summary: PortfolioSummary; status: PortfolioStatus };
 export type Tab = "overview" | "analytics" | "calendar" | "operations" | "data";
@@ -149,9 +150,7 @@ export function App() {
               <Group justify="space-between"><Text size="sm">{error}</Text><Button size="compact-sm" color="red" variant="light" onClick={() => void loadOverview()}>Повторить</Button></Group>
             </Alert>
           )}
-          {overview ? (
-            <Page tab={tab} overview={overview} revision={revision} onNavigate={navigate} onChanged={loadOverview} />
-          ) : <LoadingDashboard />}
+          {overview ? <Suspense fallback={<PageLoading />}><Page tab={tab} overview={overview} revision={revision} onNavigate={navigate} onChanged={loadOverview} /></Suspense> : <LoadingDashboard />}
         </Box>
       </AppShell.Main>
 
@@ -176,4 +175,8 @@ function Page({ tab, overview, revision, onNavigate, onChanged }: { tab: Tab; ov
 
 function LoadingDashboard() {
   return <Stack align="center" justify="center" mih={420} gap="md"><Loader size="md" /><Title order={3}>Собираем финансовую картину</Title><Text c="dimmed" size="sm">Загружаем портфель и последние показатели</Text></Stack>;
+}
+
+function PageLoading() {
+  return <Stack align="center" justify="center" mih={320} gap="sm"><Loader size="sm" /><Text c="dimmed" size="sm">Открываем раздел</Text></Stack>;
 }
