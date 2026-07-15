@@ -5,7 +5,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+PRIMARY_ENV_FILE = BASE_DIR / ".env"
+load_dotenv(PRIMARY_ENV_FILE)
 
 _db_value = os.getenv("DB_PATH", "portfolio.db")
 DB_PATH = Path(_db_value).expanduser()
@@ -13,6 +14,16 @@ if not DB_PATH.is_absolute():
     DB_PATH = BASE_DIR / DB_PATH
 DB_PATH = DB_PATH.resolve()
 DB_URL = f"sqlite:///{DB_PATH.as_posix()}"
+
+# UI-managed settings use the regular .env in a local installation. A Docker
+# image has a read-only /app and no .env, so persist the small override file on
+# the same private /data volume as the database.
+RUNTIME_SETTINGS_FILE = (
+    PRIMARY_ENV_FILE if PRIMARY_ENV_FILE.exists()
+    else DB_PATH.parent / ".portfolio-settings.env"
+)
+if RUNTIME_SETTINGS_FILE != PRIMARY_ENV_FILE:
+    load_dotenv(RUNTIME_SETTINGS_FILE, override=True)
 
 # T-Invest API
 TINVEST_TOKEN = os.getenv("TINVEST_TOKEN", "").strip()

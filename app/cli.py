@@ -146,7 +146,7 @@ def cmd_tracking_start(args):
         backup = backup_database(args.backup_output, prefix="before-tracking-start")
         result = apply_tracking_cleanup(db, start_date)
         update_env_setting(
-            config.BASE_DIR / ".env",
+            config.RUNTIME_SETTINGS_FILE,
             "PORTFOLIO_TRACKING_START_DATE",
             start_date.isoformat(),
         )

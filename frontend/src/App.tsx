@@ -6,7 +6,9 @@ import {
 } from "./api/portfolio";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { CalendarPage } from "./pages/CalendarPage";
+import { DataPage } from "./pages/DataPage";
 import { OverviewPage } from "./pages/OverviewPage";
+import { OperationsPage } from "./pages/OperationsPage";
 
 type OverviewState = {
   summary: PortfolioSummary;
@@ -89,7 +91,7 @@ export function App() {
           </div>
         )}
 
-        {overview ? <Page tab={tab} overview={overview} revision={revision} onNavigate={setTab} /> : <LoadingDashboard />}
+        {overview ? <Page tab={tab} overview={overview} revision={revision} onNavigate={setTab} onChanged={loadOverview} /> : <LoadingDashboard />}
       </main>
       <nav className="mobile-nav" aria-label="Разделы">
         {tabs.map((item) => <button type="button" className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)} key={item.id}><span aria-hidden="true">{mobileIcon(item.id)}</span>{item.short}</button>)}
@@ -98,16 +100,12 @@ export function App() {
   );
 }
 
-function Page({ tab, overview, revision, onNavigate }: { tab: Tab; overview: OverviewState; revision: number; onNavigate: (tab: Tab) => void }) {
+function Page({ tab, overview, revision, onNavigate, onChanged }: { tab: Tab; overview: OverviewState; revision: number; onNavigate: (tab: Tab) => void; onChanged: () => Promise<void> }) {
   if (tab === "analytics") return <AnalyticsPage revision={revision} />;
   if (tab === "calendar") return <CalendarPage revision={revision} />;
-  if (tab === "operations") return <ComingSoon title="Операции" text="Формы сделок, пополнений и вкладов подключаются следующим блоком." />;
-  if (tab === "data") return <ComingSoon title="Данные" text="Импорт, обновления, Excel и резервные копии подключаются следующим блоком." />;
+  if (tab === "operations") return <OperationsPage revision={revision} onChanged={onChanged} />;
+  if (tab === "data") return <DataPage status={overview.status} onChanged={onChanged} />;
   return <OverviewPage summary={overview.summary} status={overview.status} revision={revision} onNavigate={onNavigate} />;
-}
-
-function ComingSoon({ title, text }: { title: string; text: string }) {
-  return <section className="page-heading"><div><p className="eyebrow">React migration</p><h1>{title}</h1><p className="page-subtitle">{text}</p></div></section>;
 }
 
 function mobileIcon(tab: Tab) {

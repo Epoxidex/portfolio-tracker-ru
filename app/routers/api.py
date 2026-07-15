@@ -80,7 +80,7 @@ def set_tracking_start(payload: TrackingStartIn, db: Session = Depends(get_db)):
     backup = backup_database(prefix="before-tracking-start")
     result = apply_tracking_cleanup(db, payload.start_date)
     update_env_setting(
-        config.BASE_DIR / ".env",
+        config.RUNTIME_SETTINGS_FILE,
         "PORTFOLIO_TRACKING_START_DATE",
         payload.start_date.isoformat(),
     )

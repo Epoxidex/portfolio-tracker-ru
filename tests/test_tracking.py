@@ -1,5 +1,9 @@
 from datetime import date, datetime
 
+from fastapi.testclient import TestClient
+
+from app import config
+from app.main import app
 from app.models import Instrument, PriceHistory, Snapshot, Transaction
 from app.services.tracking import apply_tracking_cleanup, preview_tracking_cleanup
 
@@ -72,3 +76,19 @@ def test_tracking_cleanup_removes_only_old_broker_history(db):
     assert db.query(Transaction).filter(Transaction.note == "manual opening balance").count() == 1
     assert db.query(PriceHistory).count() == 0
     assert db.query(Snapshot).count() == 1
+
+
+def test_tracking_start_uses_writable_runtime_settings(db, tmp_path, monkeypatch):
+    settings = tmp_path / ".portfolio-settings.env"
+    monkeypatch.setattr(config, "RUNTIME_SETTINGS_FILE", settings)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/settings/tracking-start",
+            json={"start_date": "2026-04-01", "confirm": True},
+        )
+
+    assert response.status_code == 200
+    assert settings.read_text(encoding="utf-8") == (
+        "PORTFOLIO_TRACKING_START_DATE=2026-04-01\n"
+    )

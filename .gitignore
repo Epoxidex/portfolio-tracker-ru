@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+.portfolio-settings.env
 .secrets/
 
 # Portfolio data, exports and backups (contain financial information)

@@ -3,6 +3,7 @@
 .gitignore
 .env
 .env.*
+.portfolio-settings.env
 .secrets
 .venv
 venv
