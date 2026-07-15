@@ -15,6 +15,8 @@ import {
   ThemeIcon,
   Title,
   Tooltip,
+  useComputedColorScheme,
+  useMantineColorScheme,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
@@ -24,8 +26,10 @@ import {
   IconChartHistogram,
   IconDatabase,
   IconLayoutDashboard,
+  IconMoon,
   IconPlus,
   IconRefresh,
+  IconSun,
   IconWallet,
 } from "@tabler/icons-react";
 import {
@@ -58,6 +62,8 @@ export function App() {
   const [tab, setTab] = useState<Tab>("overview");
   const [revision, setRevision] = useState(0);
   const [navOpened, navHandlers] = useDisclosure(false);
+  const { setColorScheme } = useMantineColorScheme({ keepTransitions: true });
+  const computedColorScheme = useComputedColorScheme("light", { getInitialValueInEffect: true });
 
   const loadOverview = useCallback(async () => {
     setRefreshing(true);
@@ -103,6 +109,17 @@ export function App() {
           </Group>
 
           <Group gap="sm" wrap="nowrap">
+            <Tooltip label={computedColorScheme === "dark" ? "Светлая тема" : "Тёмная тема"}>
+              <ActionIcon
+                variant="default"
+                size="lg"
+                radius="md"
+                onClick={() => setColorScheme(computedColorScheme === "dark" ? "light" : "dark")}
+                aria-label={computedColorScheme === "dark" ? "Включить светлую тему" : "Включить тёмную тему"}
+              >
+                {computedColorScheme === "dark" ? <IconSun size={18} /> : <IconMoon size={18} />}
+              </ActionIcon>
+            </Tooltip>
             <Tooltip label="Обновить данные">
               <ActionIcon variant="default" size="lg" radius="md" onClick={() => void loadOverview()} loading={refreshing} aria-label="Обновить данные">
                 <IconRefresh size={18} />
