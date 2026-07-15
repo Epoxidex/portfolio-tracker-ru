@@ -4,6 +4,16 @@ from app.main import app
 from app.models import Instrument, Transaction
 
 
+def test_react_preview_reports_when_build_is_missing(monkeypatch, tmp_path):
+    from app import main as main_module
+
+    monkeypatch.setattr(main_module, "REACT_DIST", tmp_path)
+    with TestClient(main_module.app) as client:
+        response = client.get("/react-preview/")
+    assert response.status_code == 503
+    assert "npm.cmd run build" in response.text
+
+
 def test_status_never_exposes_token_or_database_path():
     with TestClient(app) as client:
         response = client.get("/api/status")

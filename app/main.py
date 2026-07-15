@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from apscheduler.schedulers.background import BackgroundScheduler
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -13,6 +13,7 @@ from .services.banki import fetch_fx
 from .dataio import DATABASE_MAINTENANCE_LOCK
 
 BASE = Path(__file__).resolve().parent.parent
+REACT_DIST = BASE / "frontend" / "dist"
 scheduler = BackgroundScheduler(timezone="Europe/Moscow")
 
 
@@ -87,4 +88,21 @@ def index():
     return FileResponse(BASE / "static" / "index.html")
 
 
+@app.get("/react-preview", include_in_schema=False)
+@app.get("/react-preview/", include_in_schema=False)
+def react_preview():
+    index_file = REACT_DIST / "index.html"
+    if not index_file.is_file():
+        return PlainTextResponse(
+            "React preview is not built. Run `npm.cmd run build` in frontend/.",
+            status_code=503,
+        )
+    return FileResponse(index_file)
+
+
+app.mount(
+    "/react-preview/assets",
+    StaticFiles(directory=REACT_DIST / "assets", check_dir=False),
+    name="react-preview-assets",
+)
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
