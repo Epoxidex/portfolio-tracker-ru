@@ -11,6 +11,7 @@ from .services.tinvest import fetch_prices
 from .services.banki import fetch_fx
 from .services.operations import sync_operations
 from .services.onboarding import add_currency_holding, create_deposit
+from .services.repairs import repair_snapshot_cost_basis
 from .services.tracking import (
     apply_tracking_cleanup, preview_tracking_cleanup, update_env_setting,
 )
@@ -168,6 +169,28 @@ def cmd_tracking_start(args):
         db.close()
 
 
+def cmd_repair_cost_basis(args):
+    try:
+        start_date = date.fromisoformat(args.from_date)
+    except ValueError:
+        raise SystemExit("error: --from-date must use YYYY-MM-DD") from None
+
+    db = _session()
+    try:
+        if not args.apply:
+            result = repair_snapshot_cost_basis(db, start_date, apply=False)
+            result["dry_run"] = True
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return
+
+        backup = backup_database(args.backup_output, prefix="before-cost-basis-repair")
+        result = repair_snapshot_cost_basis(db, start_date, apply=True)
+        result["backup"] = backup.name
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    finally:
+        db.close()
+
+
 def cmd_fetch_prices(args):
     db = _session()
     print(json.dumps(fetch_prices(db), ensure_ascii=False, indent=2)); db.close()
@@ -275,6 +298,23 @@ def build_parser():
         help="backup directory (default: backups beside the active database)",
     )
     tracking.set_defaults(func=cmd_tracking_start)
+
+    repair = sub.add_parser(
+        "repair-cost-basis",
+        help="preview or repair snapshot security cost basis from recorded operations",
+    )
+    repair.add_argument("--from-date", required=True, help="YYYY-MM-DD")
+    repair.add_argument(
+        "--apply",
+        action="store_true",
+        help="create a backup and apply the idempotent snapshot repair",
+    )
+    repair.add_argument(
+        "--backup-output",
+        default=None,
+        help="backup directory (default: backups beside the active database)",
+    )
+    repair.set_defaults(func=cmd_repair_cost_basis)
     sub.add_parser("snapshot").set_defaults(func=cmd_snapshot)
     sub.add_parser("fetch-prices").set_defaults(func=cmd_fetch_prices)
 
