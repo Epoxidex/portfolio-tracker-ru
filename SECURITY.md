@@ -62,6 +62,14 @@ A Docker volume survives container replacement but not loss of the host. Export
 current backups to another device or protected private storage. Treat every
 exported database exactly like the live database.
 
+For GitHub backups from Docker, use `compose.github.yaml` and a fine-grained
+token restricted to the one private backup repository. Store it in the ignored
+host file `.secrets/github_token`, never in `.env`, a Git URL, Docker image or
+shell command. The file is mounted as a runtime Docker secret and supplied only
+to HTTPS prompts for `github.com`. It is still an unencrypted credential on the
+host: restrict access to the file, set an expiration date and revoke it if the
+machine or file may have been compromised.
+
 ## Reporting a vulnerability
 
 Do not open a public issue containing tokens, database extracts, account IDs or transaction details. Describe the problem without private data, or contact the repository owner privately.

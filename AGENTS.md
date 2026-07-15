@@ -133,3 +133,8 @@ user's live `portfolio.db` during tests. Before committing Docker changes, check
 the resolved Compose configuration, build the image, confirm the container is
 healthy and non-root, and verify that `.env`, databases, backups and exports are
 absent from the image.
+
+The optional GitHub backup token belongs only in the ignored host file selected
+by `PORTFOLIO_GITHUB_TOKEN_SOURCE`. Never read, print, copy, commit or request the
+token in chat. Validate the Compose secret flow with a synthetic non-secret file;
+do not use the user's credential in tests.

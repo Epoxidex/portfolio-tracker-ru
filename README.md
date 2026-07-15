@@ -293,9 +293,48 @@ docker compose up -d
 ```
 
 Восстановление проверяет SQLite и сохраняет прежнюю базу как
-`/data/backups/before-restore-*.db`. Настройка UI-бэкапов в приватный Git из
-контейнера требует отдельной авторизации Git/SSH внутри контейнера; не помещайте
-GitHub-токен в `.env` или URL репозитория.
+`/data/backups/before-restore-*.db`.
+
+### Приватные GitHub-бэкапы из Docker
+
+Контейнер не видит Git Credential Manager хоста. Для кнопок просмотра, создания
+и восстановления GitHub-бэкапов используется отдельный Compose override и
+Docker secret:
+
+1. Создайте на GitHub fine-grained personal access token. Ограничьте его только
+   приватным репозиторием бэкапов и выдайте repository permission
+   **Contents: Read and write**. Для одного только восстановления достаточно
+   `Read`, но создание новых копий требует `Write`.
+2. Не отправляя токен в чат и не добавляя его в `.env`, создайте локальный файл
+   `.secrets/github_token` и вставьте туда только токен одной строкой, без кавычек.
+   Каталог `.secrets/` игнорируется Git и Docker build context.
+3. Оставьте в `.env` обычный HTTPS-адрес без логина и токена:
+
+```dotenv
+BACKUP_GIT_REPOSITORY=https://github.com/USER/PRIVATE-REPO.git
+BACKUP_GIT_BRANCH=main
+```
+
+4. Пересоздайте контейнер с GitHub-override:
+
+```bash
+docker compose -f compose.yaml -f compose.github.yaml up --build -d
+```
+
+После этого раздел **Бэкапы** работает с приватным репозиторием. Secret
+монтируется в `/run/secrets`, передаётся Git через `GIT_ASKPASS` и не сохраняется
+в образе, `.env`, remote URL или Git credential store. При обычном запуске без
+`compose.github.yaml` GitHub-доступ не включается.
+
+Если файл токена находится в другом месте, укажите в `.env` только путь к нему:
+
+```dotenv
+PORTFOLIO_GITHUB_TOKEN_SOURCE=D:/Private/portfolio-github-token
+```
+
+При смене или истечении токена замените содержимое файла и снова выполните
+команду `docker compose` с обоими Compose-файлами. Сам токен никогда не
+передавайте в командной строке: она может сохраниться в истории терминала.
 
 ## Проверка перед публикацией
 
@@ -361,6 +400,7 @@ docker compose exec -T portfolio python /app/mcp_server.py
 | `PORTFOLIO_PORT` | `8000` | Порт на компьютере для Docker Compose |
 | `PORTFOLIO_BIND_ADDRESS` | `127.0.0.1` | Адрес публикации Docker-порта; не открывайте без авторизации |
 | `PORTFOLIO_DATA_VOLUME` | `portfolio-tracker-data` | Имя постоянного Docker-тома с приватной базой |
+| `PORTFOLIO_GITHUB_TOKEN_SOURCE` | `.secrets/github_token` | Путь на хосте к Docker secret для приватных GitHub-бэкапов |
 
 ## Структура проекта
 
@@ -377,6 +417,8 @@ frontend/               React-preview и его исходный код
 mcp_server.py           локальный MCP-сервер чтения и контролируемой записи
 Dockerfile              multi-stage сборка React и Python runtime
 compose.yaml            безопасный локальный запуск и постоянный том данных
+compose.github.yaml     опциональная GitHub-аутентификация через Docker secret
+docker/git-askpass.sh   передача secret только HTTPS-запросам к github.com
 tests/                  изолированные тесты расчётов и API
 scripts/check_public.py проверка безопасности перед публикацией
 AGENTS.md               инструкция по установке и безопасности для агентов
