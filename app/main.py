@@ -9,6 +9,7 @@ from .routers import api
 from . import config
 from .services import snapshots
 from .services.tinvest import fetch_prices
+from .services.operations import sync_operations
 from .services.banki import fetch_fx
 from .dataio import DATABASE_MAINTENANCE_LOCK
 
@@ -33,6 +34,9 @@ def _job_fetch():
         db = SessionLocal()
         try:
             if config.TINVEST_TOKEN:
+                operations = sync_operations(db, days_back=30)
+                if not operations.get("ok"):
+                    print("sync-operations job error:", operations.get("error"))
                 fetch_prices(db)
         except Exception as e:
             print("fetch-prices job error:", e)

@@ -62,7 +62,7 @@ function toast(msg, type = "") {
 function renderKpis(s) {
   const cards = [
     { label: "Стоимость", value: fmt(s.value), sub: pct(s.pnl_pct), c: "", subC: cls(s.pnl), accent: COLORS.amber },
-    { label: "Вложено", value: fmt(s.invested), sub: "", c: "", accent: COLORS.blue },
+    { label: "Вложено", value: fmt(s.invested), sub: "только внешние пополнения", c: "", accent: COLORS.blue },
     { label: "Прибыль", value: fmt(s.pnl), sub: pct(s.pnl_pct), c: cls(s.pnl),
       accent: s.pnl >= 0 ? COLORS.green : COLORS.red },
     { label: "XIRR годовых", value: s.xirr == null ? "нет данных" : pct(s.xirr),
@@ -155,10 +155,10 @@ function renderValue(hist = _valueHistory) {
   const val = rows.map(h => h.value);
   const inv = rows.map(h => h.invested);
   chart("chart-value", {
-    aria: { enabled: true, description: "График стоимости портфеля и вложенного капитала по снимкам" },
+    aria: { enabled: true, description: "График стоимости портфеля и внешних пополнений по снимкам" },
     grid: { left: 64, right: 16, top: 30, bottom: 30 },
     tooltip: { trigger: "axis", valueFormatter: v => fmt(v) },
-    legend: { data: ["Стоимость", "Вложено"], textStyle: { color: COLORS.muted, fontSize: 10 }, top: 0, itemWidth: 16, itemHeight: 6 },
+    legend: { data: ["Стоимость", "Внешние пополнения"], textStyle: { color: COLORS.muted, fontSize: 10 }, top: 0, itemWidth: 16, itemHeight: 6 },
     xAxis: { type: "category", data: x, ...AX },
     yAxis: { type: "value", ...AX, axisLabel: { color: COLORS.muted, formatter: v => (v / 1000) + "k" } },
     series: [
@@ -166,7 +166,7 @@ function renderValue(hist = _valueHistory) {
         lineStyle: { width: 2.5, color: COLORS.amber }, itemStyle: { color: COLORS.amber },
         areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1,
           [{ offset: 0, color: "rgba(244,196,87,.24)" }, { offset: 1, color: "rgba(244,196,87,0)" }]) } },
-      { name: "Вложено", type: "line", smooth: true, data: inv, symbol: "none",
+      { name: "Внешние пополнения", type: "line", smooth: true, data: inv, symbol: "none",
         lineStyle: { width: 1.5, color: COLORS.blue, type: "dashed" } },
     ],
   });
@@ -503,7 +503,7 @@ let _fxLabel = "";
 function renderPositions(pos) {
   const head = `<thead><tr>
     <th>Инструмент</th><th>Тип</th><th>Кол-во</th>
-    <th>Вложено</th><th>Стоимость</th><th>Выплаты</th><th>P&L</th><th>%</th>
+    <th>Себестоимость</th><th>Стоимость</th><th>Выплаты</th><th>P&L</th><th>%</th>
   </tr></thead>`;
 
   const groups = {};
@@ -527,7 +527,7 @@ function renderPositions(pos) {
         <td>${escapeHtml(p.name)}${sub}</td>
         <td><span class="kind-badge">${escapeHtml(KIND_RU[p.kind] || p.kind)}</span></td>
         <td class="num">${p.qty.toLocaleString("ru-RU")}</td>
-        <td class="num">${fmt(p.invested)}</td>
+        <td class="num">${fmt(p.cost_basis ?? p.invested)}</td>
         <td class="num">${fmt(p.value)}</td>
         <td class="${cls(p.income)}">${p.income ? fmt(p.income, 2) : "—"}</td>
         <td class="${cls(p.pnl)}">${fmt(p.pnl, 2)}</td>

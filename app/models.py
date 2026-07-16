@@ -27,7 +27,7 @@ class Transaction(Base):
     id = Column(Integer, primary_key=True)
     ts = Column(Date, nullable=False)
     instrument_id = Column(Integer, ForeignKey("instruments.id"))
-    kind = Column(String, nullable=False)        # buy | sell | coupon | dividend | interest | fx_buy | fx_sell
+    kind = Column(String, nullable=False)        # buy/sell/income/fx_buy/fx_sell/topup/withdrawal
     quantity = Column(Float, default=0.0)        # >0 всегда
     price = Column(Float, default=0.0)
     amount = Column(Float, default=0.0)          # ЗНАКОВЫЙ денежный поток из «кармана инвестиций»:

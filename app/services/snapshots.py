@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta
 from .. import config
 from ..models import Instrument, Snapshot, Transaction
+from . import capital
 from .portfolio import summary
 
 
@@ -35,20 +36,40 @@ def take_snapshot(db, source="auto"):
 
 def history(db, limit=2000):
     rows = db.query(Snapshot).order_by(Snapshot.ts).limit(limit).all()
+    transactions = db.query(Transaction).all()
     by_day = {}
     for r in rows:
         day = _portfolio_day(r.ts)
         if config.PORTFOLIO_TRACKING_START_DATE and day < config.PORTFOLIO_TRACKING_START_DATE:
             continue
         by_day[day.isoformat()] = r
-    return [{
-        "ts": r.ts.isoformat(),
-        "day": _portfolio_day(r.ts).isoformat(),
-        "value": r.total_value, "invested": r.total_invested,
-        "pnl": r.total_pnl, "income": r.income_received,
-        "by_class": r.by_class,
-        "by_instrument": r.by_instrument or {},
-    } for r in sorted(by_day.values(), key=lambda x: x.ts)]
+    result = []
+    for r in sorted(by_day.values(), key=lambda x: x.ts):
+        day = _portfolio_day(r.ts)
+        if transactions:
+            external = capital.capital_summary(
+                db,
+                on=day,
+                include_current_broker_state=day >= date.today(),
+                _transactions=transactions,
+            )
+            invested = external["contributed"]
+            pnl = float(r.total_value or 0) + external["withdrawn"] - invested
+        else:
+            # Synthetic/very old snapshots can predate the transaction ledger.
+            invested = float(r.total_invested or 0)
+            pnl = float(r.total_pnl or 0)
+        result.append({
+            "ts": r.ts.isoformat(),
+            "day": day.isoformat(),
+            "value": r.total_value,
+            "invested": invested,
+            "pnl": round(pnl, 2),
+            "income": r.income_received,
+            "by_class": r.by_class,
+            "by_instrument": r.by_instrument or {},
+        })
+    return result
 
 
 def _instrument_changes(db, reference, current):

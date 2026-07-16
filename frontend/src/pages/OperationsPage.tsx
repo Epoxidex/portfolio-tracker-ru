@@ -30,10 +30,22 @@ export function OperationsPage({ revision, onChanged }: { revision: number; onCh
     finally { setBusy(false); }
   };
 
-  const settle = (item: Reconciliation) => perform(() => mutate("/ledger/deposits/settle", {
-    request_id: requestId("ui-settle"), confirm: true, instrument: `id:${item.instrument_id}`,
-    settled_on: today, actual_payout_rub: item.estimated_payout_rub,
-  }), `Вклад «${item.name}» закрыт, выплата добавлена в RUB`);
+  const settle = (item: Reconciliation) => {
+    const entered = window.prompt(
+      `Укажите фактическую выплату по вкладу «${item.name}», ₽`,
+      String(item.estimated_payout_rub ?? ""),
+    );
+    if (entered === null) return;
+    const actualPayout = Number(entered.replace(",", "."));
+    if (!Number.isFinite(actualPayout) || actualPayout <= 0) {
+      setNotice({ text: "Фактическая выплата должна быть положительным числом", error: true });
+      return;
+    }
+    void perform(() => mutate("/ledger/deposits/settle", {
+      request_id: requestId("ui-settle"), confirm: true, instrument: `id:${item.instrument_id}`,
+      settled_on: today, actual_payout_rub: actualPayout,
+    }), `Вклад «${item.name}» закрыт, выплата добавлена в RUB`);
+  };
 
   return (
     <>
@@ -57,7 +69,7 @@ export function OperationsPage({ revision, onChanged }: { revision: number; onCh
         </Paper>
         <Paper withBorder radius="xl" p={{base:"md",md:"xl"}}>
           <Group justify="space-between"><div><Text className="section-kicker">Последние записи</Text><Title order={3}>История операций</Title></div><Badge variant="light">{transactions.length}</Badge></Group>
-          <Stack gap={0} mt="lg" className="transaction-modern-list">{transactions.length?transactions.slice(0,80).map(tx=><Group className="transaction-modern-row" key={tx.id} justify="space-between" wrap="nowrap"><Group wrap="nowrap"><div className={`transaction-icon ${tx.amount>=0?"in":"out"}`}>{tx.amount>=0?"+":"−"}</div><div><Text size="sm" fw={700}>{tx.ticker||tx.instrument||transactionName(tx.kind)}</Text><Text size="xs" c="dimmed">{formatDate(tx.date)} · {transactionName(tx.kind)}{tx.quantity?` · ${Math.abs(tx.quantity).toLocaleString("ru-RU")}`:""}</Text></div></Group><Text size="sm" fw={750} c={tx.amount>=0?"teal.7":"red.6"}>{formatMoney(tx.amount,true)}</Text></Group>):<Text c="dimmed" ta="center" py={60}>Операций пока нет</Text>}</Stack>
+          <Stack gap={0} mt="lg" className="transaction-modern-list">{transactions.length?transactions.slice(0,80).map(tx=><Group className="transaction-modern-row" key={tx.id} justify="space-between" wrap="nowrap"><Group wrap="nowrap"><div className={`transaction-icon ${tx.amount>=0?"in":"out"}`}>{tx.amount>=0?"+":"−"}</div><div><Text size="sm" fw={700}>{tx.ticker||tx.instrument||transactionName(tx)}</Text><Text size="xs" c="dimmed">{formatDate(tx.date)} · {transactionName(tx)}{tx.quantity?` · ${Math.abs(tx.quantity).toLocaleString("ru-RU")}`:""}</Text></div></Group><Text size="sm" fw={750} c={tx.amount>=0?"teal.7":"red.6"}>{formatMoney(tx.amount,true)}</Text></Group>):<Text c="dimmed" ta="center" py={60}>Операций пока нет</Text>}</Stack>
         </Paper>
       </div>
     </>
@@ -87,4 +99,13 @@ function SecurityForm({ busy, perform }: { busy: boolean; perform: Perform }) {
 }
 
 function CashMetric({ label, value, icon: Icon, color }: { label: string; value: number; icon: typeof IconCash; color: string }) { return <Paper withBorder radius="lg" p="lg"><Group wrap="nowrap"><ThemeIcon size={42} radius="md" variant="light" color={color}><Icon size={20}/></ThemeIcon><div><Text size="xs" c="dimmed" fw={650}>{label}</Text><Text size="xl" fw={780}>{formatMoney(value)}</Text></div></Group></Paper>; }
-function transactionName(kind: string) { return ({ buy: "Покупка", sell: "Продажа", fx_buy: "Покупка валюты", fx_sell: "Продажа валюты", coupon: "Купон", dividend: "Дивиденд", interest: "Проценты", topup: "Пополнение", withdrawal: "Вывод" } as Record<string, string>)[kind] || kind; }
+function transactionName(tx: Transaction) {
+  const note = tx.note ?? "";
+  if (note.includes(":rub-to-deposit")) return "Перевод RUB во вклад";
+  if (note.includes(":deposit-to-rub")) return "Выплата вклада в RUB";
+  if (note.includes(":rub-to-currency")) return "Перевод RUB в валюту";
+  if (note.includes(":currency-to-rub")) return "Продажа валюты в RUB";
+  if (note.includes(":rub-to-security")) return "Перевод RUB в бумаги";
+  if (note.includes(":security-to-rub")) return "Продажа бумаг в RUB";
+  return ({ buy: "Покупка", sell: "Продажа", fx_buy: "Покупка валюты", fx_sell: "Продажа валюты", coupon: "Купон", dividend: "Дивиденд", interest: "Проценты", topup: "Пополнение", withdrawal: "Вывод" } as Record<string, string>)[tx.kind] || tx.kind;
+}

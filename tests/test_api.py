@@ -39,9 +39,13 @@ def test_deposit_is_created_atomically(db):
     assert response.status_code == 200
     assert response.json()["estimated_interest"] > 0
     db.expire_all()
-    assert db.query(Instrument).count() == 1
-    tx = db.query(Transaction).one()
-    assert tx.amount == -200_000
+    assert db.query(Instrument).count() == 2  # RUB cash ledger + deposit
+    transactions = db.query(Transaction).order_by(Transaction.id).all()
+    assert [(tx.kind, tx.amount) for tx in transactions] == [
+        ("topup", 200_000),
+        ("withdrawal", -200_000),
+        ("buy", -200_000),
+    ]
 
 
 def test_invalid_deposit_does_not_leave_partial_rows(db):

@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from collections import defaultdict
 from ..models import Instrument, Transaction
+from . import capital
 
 
 # ---------- XIRR ----------
@@ -12,7 +13,11 @@ def _xnpv(rate, flows):
 def xirr(flows, guess=0.12):
     """flows: list[(date, amount)], amount знаковый. Метод Ньютона + бисекция-фолбэк."""
     flows = [(d, float(a)) for d, a in flows if a]
-    if len(flows) < 2 or not (any(a < 0 for _, a in flows) and any(a > 0 for _, a in flows)):
+    if (
+        len(flows) < 2
+        or len({d for d, _ in flows}) < 2
+        or not (any(a < 0 for _, a in flows) and any(a > 0 for _, a in flows))
+    ):
         return None
     rate = guess
     for _ in range(100):
@@ -185,11 +190,7 @@ def positions(db, on=None):
                 broker_balance = float(
                     meta.get("broker_balance", meta.get("balance", 0)) or 0
                 )
-                manual_balance = sum(
-                    float(tx.amount or 0)
-                    for tx in txs
-                    if tx.kind in {"topup", "withdrawal"}
-                )
+                manual_balance = capital.manual_cash_balance(db, on=on)
                 balance = broker_balance + manual_balance
                 if balance <= 0:
                     continue
@@ -237,7 +238,12 @@ def _pos(inst, qty, invested, value, income, unrealized, realized):
     return {
         "id": inst.id, "kind": inst.kind, "name": inst.name,
         "ticker": inst.ticker, "isin": inst.isin, "currency": inst.currency,
-        "qty": round(qty, 4), "invested": round(invested, 2), "value": round(value, 2),
+        "qty": round(qty, 4),
+        "cost_basis": round(invested, 2),
+        # Backward-compatible alias. Portfolio-level ``invested`` has the
+        # stricter meaning of outside contributions; a position has a cost basis.
+        "invested": round(invested, 2),
+        "value": round(value, 2),
         "income": round(income, 2), "unrealized": round(unrealized, 2),
         "realized": round(realized, 2), "pnl": round(pnl, 2),
         "pnl_pct": round(pnl / invested, 4) if invested else 0,
@@ -253,48 +259,47 @@ CLASS_RU = {"bond": "Облигации", "share": "Акции", "etf": "Фон�
 def summary(db, on=None):
     on = on or date.today()
     pos = positions(db, on)
-    by_class = defaultdict(lambda: {"invested": 0.0, "value": 0.0, "pnl": 0.0})
-    tot = {"invested": 0.0, "value": 0.0, "pnl": 0.0, "income": 0.0}
+    by_class = defaultdict(lambda: {"cost_basis": 0.0, "value": 0.0, "pnl": 0.0})
+    tot = {"cost_basis": 0.0, "value": 0.0}
     for p in pos:
         c = CLASS_RU.get(p["kind"], p["kind"])
-        by_class[c]["invested"] += p["invested"]
+        by_class[c]["cost_basis"] += p["cost_basis"]
         by_class[c]["value"] += p["value"]
         by_class[c]["pnl"] += p["pnl"]
-        for k in ("invested", "value", "pnl"):
-            tot[k] += p[k]
-        tot["income"] += p["income"]
+        tot["cost_basis"] += p["cost_basis"]
+        tot["value"] += p["value"]
 
-    flows = []
-    for t in db.query(Transaction).filter(Transaction.instrument_id.isnot(None)).all():
-        if t.instrument and t.instrument.kind == "currency" and t.instrument.currency == "RUB":
-            continue
-        if t.amount:
-            flows.append((t.ts, t.amount))
-    # Ruble cash is excluded from the terminal XIRR value: security sales are
-    # already positive flows. Including the same proceeds again as RUB balance
-    # would double count them.
-    terminal_value = sum(
-        p["value"] for p in pos
-        if not (p["kind"] == "currency" and p["currency"] == "RUB")
+    external = capital.capital_summary(
+        db,
+        on=on,
+        include_current_broker_state=on >= date.today(),
     )
-    flows.append((on, terminal_value))
+    contributed = external["contributed"]
+    withdrawn = external["withdrawn"]
+    pnl = tot["value"] + withdrawn - contributed
+    flows = [*external["events"], (on, tot["value"])]
     r = xirr(flows)
 
     for c in by_class.values():
-        c["pnl_pct"] = c["pnl"] / c["invested"] if c["invested"] else 0
-        for k in ("invested", "value", "pnl"):
+        c["pnl_pct"] = c["pnl"] / c["cost_basis"] if c["cost_basis"] else 0
+        for k in ("cost_basis", "value", "pnl"):
             c[k] = round(c[k], 2)
+        c["invested"] = c["cost_basis"]  # compatibility for older API clients
         c["pnl_pct"] = round(c["pnl_pct"], 4)
     from .snapshots import compute_streak
     streak = compute_streak(db)
     lifetime = realized_results(db)
     return {
         "as_of": on.isoformat(),
-        "invested": round(tot["invested"], 2),
+        "invested": contributed,
+        "external_withdrawals": withdrawn,
+        "net_external_capital": external["net"],
+        "capital_inferred": external["inferred"],
+        "cost_basis": round(tot["cost_basis"], 2),
         "value": round(tot["value"], 2),
-        "pnl": round(tot["pnl"], 2),
-        "pnl_pct": round(tot["pnl"] / tot["invested"], 4) if tot["invested"] else 0,
-        "income_received": round(tot["income"], 2),
+        "pnl": round(pnl, 2),
+        "pnl_pct": round(pnl / contributed, 4) if contributed else 0,
+        "income_received": lifetime["income"],
         "xirr": round(r, 4) if r is not None else None,
         "streak": streak,
         "lifetime_results": lifetime,

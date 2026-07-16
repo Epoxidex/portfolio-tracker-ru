@@ -11,7 +11,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from ..models import Instrument, MutationRequest, Snapshot, Transaction
-from . import portfolio
+from . import capital, portfolio
 
 
 class LedgerConflict(ValueError):
@@ -121,15 +121,10 @@ def rub_cash_balance(db: Session) -> dict[str, float]:
         Instrument.kind == "currency", Instrument.currency == "RUB"
     ).all()
     broker = 0.0
-    manual = 0.0
     for instrument in instruments:
         meta = instrument.meta or {}
         broker += float(meta.get("broker_balance", meta.get("balance", 0)) or 0)
-        manual += sum(
-            float(tx.amount or 0)
-            for tx in instrument.transactions
-            if tx.kind in {"topup", "withdrawal"}
-        )
+    manual = capital.manual_cash_balance(db)
     return {
         "broker": round(broker, 2),
         "manual": round(manual, 2),

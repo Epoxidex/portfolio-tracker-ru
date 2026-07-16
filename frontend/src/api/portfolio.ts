@@ -1,6 +1,7 @@
 import { apiRequest } from "./client";
 
 export type PortfolioClassSummary = {
+  cost_basis: number;
   invested: number;
   value: number;
   pnl: number;
@@ -10,6 +11,10 @@ export type PortfolioClassSummary = {
 export type PortfolioSummary = {
   as_of: string;
   invested: number;
+  external_withdrawals: number;
+  net_external_capital: number;
+  capital_inferred: number;
+  cost_basis: number;
   value: number;
   pnl: number;
   pnl_pct: number;

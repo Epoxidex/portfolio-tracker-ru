@@ -9,7 +9,9 @@ from app.models import Instrument, Snapshot, Transaction
 from app.services.ledger import (
     LedgerConflict, apply_actions, pending_reconciliations, rub_cash_balance,
 )
+from app.services.onboarding import create_deposit
 from app.services.portfolio import positions, realized_results, summary
+from app.services.snapshots import history
 from app.services.tinvest import _sync_rub_balance
 
 
@@ -133,6 +135,133 @@ def test_matured_deposit_settlement_closes_asset_and_credits_rub(db):
     assert deposit.meta["status"] == "closed"
     assert realized_results(db)["income"] == 10_000
     assert pending_reconciliations(db, on=date(2026, 7, 1))["total"] == 0
+
+
+def test_reinvested_deposit_profit_does_not_increase_external_capital(db):
+    first = create_deposit(
+        db,
+        name="Первоначальный вклад",
+        principal=200_000,
+        open_date=date(2025, 7, 16),
+        close_date=date(2026, 7, 16),
+        annual_rate_pct=5,
+        interest_mode="simple",
+    )
+    assert first["external_topup"] == 200_000
+
+    apply_actions(
+        db,
+        request_id="test-reinvest-settle-001",
+        actions=[{
+            "type": "settle_deposit",
+            "instrument": "Первоначальный вклад",
+            "settled_on": "2026-07-16",
+            "actual_payout_rub": 210_000,
+        }],
+        create_snapshot=False,
+    )
+    second = create_deposit(
+        db,
+        name="Новый вклад 50",
+        principal=50_000,
+        open_date=date(2026, 7, 16),
+        close_date=date(2027, 7, 16),
+        annual_rate_pct=5,
+    )
+    third = create_deposit(
+        db,
+        name="Новый вклад 160",
+        principal=160_000,
+        open_date=date(2026, 7, 16),
+        close_date=date(2027, 7, 16),
+        annual_rate_pct=5,
+    )
+
+    result = summary(db, on=date(2026, 7, 16))
+    assert second["external_topup"] == 0
+    assert third["external_topup"] == 0
+    assert result["invested"] == 200_000
+    assert result["cost_basis"] == 210_000
+    assert result["value"] == 210_000
+    assert result["pnl"] == 10_000
+    assert result["income_received"] == 10_000
+    assert result["capital_inferred"] == 0
+    assert history(db)[-1]["invested"] == 200_000
+    assert rub_cash_balance(db)["manual"] == 0
+
+
+def test_external_withdrawal_keeps_realized_profit_in_headline(db):
+    create_deposit(
+        db,
+        name="Вклад для вывода",
+        principal=200_000,
+        open_date=date(2025, 7, 16),
+        close_date=date(2026, 7, 16),
+        annual_rate_pct=5,
+    )
+    apply_actions(
+        db,
+        request_id="test-withdraw-profit-001",
+        actions=[
+            {
+                "type": "settle_deposit", "instrument": "Вклад для вывода",
+                "settled_on": "2026-07-16", "actual_payout_rub": 210_000,
+            },
+            {"type": "cash_withdrawal", "amount_rub": 210_000, "date": "2026-07-16"},
+        ],
+        create_snapshot=False,
+    )
+
+    result = summary(db, on=date(2026, 7, 16))
+    assert result["invested"] == 200_000
+    assert result["external_withdrawals"] == 210_000
+    assert result["value"] == 0
+    assert result["pnl"] == 10_000
+
+
+def test_legacy_deposit_reinvestment_uses_settlement_cash(db):
+    legacy = Instrument(
+        kind="deposit",
+        name="Старый формат",
+        currency="RUB",
+        meta={
+            "principal": 200_000,
+            "open_date": "2025-07-16",
+            "close_date": "2026-07-16",
+            "eff_rate": 0.05,
+            "interest_mode": "simple",
+        },
+    )
+    db.add(legacy)
+    db.flush()
+    db.add(Transaction(
+        ts=date(2025, 7, 16), instrument_id=legacy.id,
+        kind="buy", quantity=1, amount=-200_000, note="deposit opened",
+    ))
+    db.commit()
+    apply_actions(
+        db,
+        request_id="test-legacy-settle-001",
+        actions=[{
+            "type": "settle_deposit", "instrument": "Старый формат",
+            "settled_on": "2026-07-16", "actual_payout_rub": 210_000,
+        }],
+        create_snapshot=False,
+    )
+    new = create_deposit(
+        db,
+        name="После старого",
+        principal=210_000,
+        open_date=date(2026, 7, 16),
+        close_date=date(2027, 7, 16),
+        annual_rate_pct=5,
+    )
+
+    result = summary(db, on=date(2026, 7, 16))
+    assert new["external_topup"] == 0
+    assert result["invested"] == 200_000
+    assert result["value"] == 210_000
+    assert result["pnl"] == 10_000
 
 
 def test_matured_deposit_is_reported_before_settlement(db):

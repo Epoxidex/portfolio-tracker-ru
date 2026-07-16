@@ -6,10 +6,11 @@ This application is a personal dashboard, not a broker report or accounting syst
 
 - Securities and foreign currency use a moving weighted-average cost basis. A sale realizes the difference between its proceeds and the released average cost; a later purchase starts from the remaining cost basis. For a T-Invest position, the broker quantity is authoritative, while cost comes from recorded operations when they explain that quantity. If the imported history is incomplete, the broker average price is used instead. Current market value and `expected_yield` never redefine historical cost.
 - Bond value includes the current clean price plus accrued coupon income (НКД).
-- Current P&L is unrealized P&L plus recorded coupons/dividends and realized P&L for positions that remain open.
+- Position P&L is unrealized P&L plus recorded coupons/dividends and moving-average realized P&L. The portfolio headline uses external-capital accounting instead: current value plus factual external withdrawals minus factual external contributions. Selling, settling, or reinvesting inside the portfolio therefore does not reset or increase lifetime profit.
 - Fully closed positions are not shown in the active positions table. This means the dashboard is primarily a view of the current portfolio, not a lifetime tax ledger.
 - `lifetime_results` separately retains recorded coupons, dividends, deposit interest and moving-average realized P&L for closed as well as active assets. It is still an estimate when imported broker history starts after the true acquisition date.
-- XIRR is calculated from instrument cash flows and the current terminal value of invested assets. Ruble cash from T-Invest is excluded from the terminal value to avoid counting sale proceeds twice. Treat XIRR as an estimate, especially when the imported operation history is incomplete.
+- `invested` means gross money contributed from outside the portfolio, not the current cost basis of its assets. Position rows expose that different concept as `cost_basis` (and retain `invested` as a compatibility alias).
+- XIRR is calculated from external contributions, external withdrawals, and the current total portfolio value. Treat XIRR as an estimate when imported broker history is incomplete.
 
 ## Ruble cash and internal transfers
 
@@ -25,6 +26,13 @@ example, buying USD subtracts the all-in RUB cost and creates `fx_buy`; selling
 USD creates `fx_sell` and adds the net factual proceeds to RUB. RUB ledger rows
 are excluded from XIRR and period-leader calculations so an internal transfer
 does not look like investment performance.
+
+Only cash rows identified as external funding or withdrawal affect portfolio
+`invested` and headline lifetime P&L. Deposit settlements, security sales,
+coupon/dividend payments and subsequent purchases are internal movements. For
+legacy local rows and broker histories without explicit cash inputs, the app
+infers the smallest outside contribution needed to fund the recorded cash
+outflows. The summary reports that inferred portion separately.
 
 ## Day, week and month changes
 
@@ -86,7 +94,7 @@ that a broker trade or payment occurred.
 
 ## Data-source limitations
 
-- T-Invest synchronization imports the operation types the application understands: buys, sells, coupons, dividends and bond repayments. Taxes, fees and some corporate actions are not yet a complete accounting model.
+- T-Invest synchronization imports the operation types the application understands: cash inputs/outputs, buys, sells, coupons, dividends and bond repayments. Taxes, fees, securities transfers and some corporate actions are not yet a complete accounting model.
 - T-Bank itself recommends a broker report when operation history must be exact; some corporate-action history can be incomplete in the API.
 - Future coupon/dividend calendars require instrument metadata. A newly discovered instrument can have a price and transaction history before its future-payment metadata is available. An exact bond schedule can be supplied through REST or MCP until automatic source data is available.
 - The official CBR rate is the default currency source. `bank_buy` and `bank_sell` scrape one configured third-party bank page and can stop working when that page changes.

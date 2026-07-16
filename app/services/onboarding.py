@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import math
 from datetime import date
+from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
 from ..models import Instrument, Transaction
-from . import portfolio
+from . import ledger
 
 
 class SetupConflict(ValueError):
@@ -55,36 +56,43 @@ def create_deposit(
                 f"deposit {name!r} with opening date {open_date.isoformat()} already exists"
             )
 
-    meta = {
+    available = ledger.rub_cash_balance(db)["manual"]
+    shortfall = max(0.0, round(principal - available, 2))
+    actions = []
+    if shortfall >= 0.005:
+        # The legacy setup endpoint has no separate cash step. Only the missing
+        # amount is outside capital; existing RUB (including interest and sale
+        # proceeds) is reused without becoming another contribution.
+        actions.append({
+            "type": "cash_topup",
+            "amount_rub": shortfall,
+            "date": open_date.isoformat(),
+            "note": "automatic outside funding for deposit",
+        })
+    actions.append({
+        "type": "open_deposit",
+        "name": name,
         "principal": principal,
         "open_date": open_date.isoformat(),
         "close_date": close_date.isoformat(),
-        "eff_rate": annual_rate_pct / 100,
+        "annual_rate_pct": annual_rate_pct,
         "interest_mode": interest_mode,
-    }
-    inst = Instrument(kind="deposit", name=name, currency="RUB", meta=meta)
+    })
     try:
-        db.add(inst)
-        db.flush()
-        db.add(Transaction(
-            ts=open_date,
-            instrument_id=inst.id,
-            kind="buy",
-            quantity=1,
-            amount=-principal,
-            note="deposit opened",
-        ))
-        db.flush()
-        estimate = portfolio.deposit_value(inst, close_date) - principal
-        db.commit()
-        db.refresh(inst)
-    except Exception:
-        db.rollback()
-        raise
+        result = ledger.apply_actions(
+            db,
+            request_id=f"deposit-{uuid4().hex}",
+            actions=actions,
+            create_snapshot=True,
+        )
+    except ledger.LedgerConflict as exc:
+        raise SetupConflict(str(exc)) from exc
+    opened = result["actions"][-1]
     return {
         "ok": True,
-        "id": inst.id,
-        "estimated_interest": round(estimate, 2),
+        "id": opened["instrument_id"],
+        "estimated_interest": opened["estimated_interest"],
+        "external_topup": round(shortfall, 2),
     }
 
 

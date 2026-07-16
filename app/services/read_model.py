@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from .. import config
 from ..models import Instrument, PriceHistory, Snapshot, Transaction
 from . import calendar as cal
-from . import portfolio, snapshots
+from . import capital, portfolio, snapshots
 from .git_backup import backup_status
 
 
@@ -21,7 +21,7 @@ TRANSACTION_KINDS = {
     "topup", "withdrawal",
 }
 SORTABLE_POSITION_FIELDS = {
-    "name", "kind", "qty", "invested", "value", "income", "pnl", "pnl_pct",
+    "name", "kind", "qty", "cost_basis", "invested", "value", "income", "pnl", "pnl_pct",
 }
 
 
@@ -308,12 +308,29 @@ def portfolio_history(
         if end:
             q = q.filter(Snapshot.ts < datetime.combine(end + timedelta(days=1), time.min) - timedelta(hours=3))
         raw = q.order_by(Snapshot.ts.desc()).limit(limit).all()
-        rows = [{
-            "ts": row.ts.isoformat(), "value": row.total_value,
-            "invested": row.total_invested, "pnl": row.total_pnl,
-            "income": row.income_received, "by_class": row.by_class or {},
-            "by_instrument": row.by_instrument or {}, "source": row.source,
-        } for row in reversed(raw)]
+        transactions = db.query(Transaction).all()
+        rows = []
+        for row in reversed(raw):
+            row_day = (row.ts + timedelta(hours=3)).date()
+            if transactions:
+                external = capital.capital_summary(
+                    db,
+                    on=row_day,
+                    include_current_broker_state=row_day >= date.today(),
+                    _transactions=transactions,
+                )
+                invested = external["contributed"]
+                pnl = float(row.total_value or 0) + external["withdrawn"] - invested
+            else:
+                invested = float(row.total_invested or 0)
+                pnl = float(row.total_pnl or 0)
+            rows.append({
+                "ts": row.ts.isoformat(), "value": row.total_value,
+                "invested": invested,
+                "pnl": round(pnl, 2),
+                "income": row.income_received, "by_class": row.by_class or {},
+                "by_instrument": row.by_instrument or {}, "source": row.source,
+            })
     return {"items": rows, "returned": len(rows), "granularity": granularity}
 
 

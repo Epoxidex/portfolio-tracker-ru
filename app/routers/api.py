@@ -330,7 +330,7 @@ def do_sync_operations(
     days: int = Query(default=365, description="глубина истории в днях"),
     db: Session = Depends(get_db),
 ):
-    """Импортирует операции из T-Invest (buy/sell/coupon/dividend)."""
+    """Импортирует сделки, выплаты и внешние вводы/выводы из T-Invest."""
     return sync_operations(db, days_back=days)
 
 
@@ -386,12 +386,12 @@ def export_excel(db: Session = Depends(get_db)):
     # Лист 1: Позиции
     ws = wb.active
     ws.title = "Позиции"
-    pos_headers = ["Название", "Тип", "Кол-во", "Вложено ₽", "Стоимость ₽",
+    pos_headers = ["Название", "Тип", "Кол-во", "Себестоимость ₽", "Стоимость ₽",
                    "Доход ₽", "P&L ₽", "P&L %", "Цена", "НКД"]
     ws.append(pos_headers)
     for p in portfolio.positions(db):
         ws.append([
-            p["name"], p["kind"], p["qty"], p["invested"], p["value"],
+            p["name"], p["kind"], p["qty"], p["cost_basis"], p["value"],
             p["income"], p["pnl"], round(p["pnl_pct"] * 100, 2),
             p["last_price"], p["nkd"],
         ])
@@ -409,7 +409,7 @@ def export_excel(db: Session = Depends(get_db)):
 
     # Лист 3: Снапшоты
     ws3 = wb.create_sheet("Снапшоты")
-    ws3.append(["Дата", "Стоимость ₽", "Вложено ₽", "P&L ₽", "Доход ₽"])
+    ws3.append(["Дата", "Стоимость ₽", "Внешние пополнения ₽", "P&L ₽", "Доход ₽"])
     for row in snapshots.history(db):
         ws3.append([row["ts"][:10], row["value"], row["invested"],
                     row["pnl"], row["income"]])

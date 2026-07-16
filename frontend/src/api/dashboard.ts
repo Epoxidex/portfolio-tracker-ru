@@ -7,6 +7,7 @@ export type Position = {
   ticker: string | null;
   currency: string;
   qty: number;
+  cost_basis: number;
   invested: number;
   value: number;
   income: number;

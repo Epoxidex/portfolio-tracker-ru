@@ -6,7 +6,7 @@ import { formatMoney, formatPercent } from "../lib/format";
 export function KpiGrid({ summary }: { summary: PortfolioSummary }) {
   const cards = [
     { label: "Стоимость портфеля", value: formatMoney(summary.value), detail: `${formatPercent(summary.pnl_pct)} за всё время`, positive: summary.pnl >= 0, icon: IconCoins, color: "indigo" },
-    { label: "Вложено", value: formatMoney(summary.invested), detail: "Учтённая себестоимость", icon: IconPigMoney, color: "blue" },
+    { label: "Вложено", value: formatMoney(summary.invested), detail: "Только внешние пополнения", icon: IconPigMoney, color: "blue" },
     { label: "Финансовый результат", value: formatMoney(summary.pnl, true), detail: `${formatMoney(summary.income_received)} выплат получено`, positive: summary.pnl >= 0, icon: IconTrendingUp, color: summary.pnl >= 0 ? "teal" : "red" },
     { label: "XIRR", value: summary.xirr === null ? "Нет данных" : formatPercent(summary.xirr), detail: summary.xirr === null ? "Нужна история денежных потоков" : "Годовых с учётом дат", positive: summary.xirr === null ? undefined : summary.xirr >= 0, icon: IconChartLine, color: "violet" },
   ];

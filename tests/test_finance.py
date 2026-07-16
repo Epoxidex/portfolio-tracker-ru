@@ -5,6 +5,7 @@ import pytest
 
 from app.models import Instrument, Snapshot, Transaction
 from app.services.portfolio import deposit_value_from_meta, _moving_average_book, positions
+from app.services.portfolio import xirr
 from app.services.snapshots import compute_leaders, compute_returns, compute_streak
 from app.services.tinvest import _sync_portfolio_state
 
@@ -30,6 +31,10 @@ def test_simple_deposit_uses_daily_accrual():
         "interest_mode": "simple",
     }
     assert deposit_value_from_meta(meta, date(2027, 1, 1)) == pytest.approx(110_000)
+
+
+def test_xirr_requires_cash_flows_on_different_dates():
+    assert xirr([(date(2026, 7, 16), -200_000), (date(2026, 7, 16), 200_000)]) is None
 
 
 def test_monthly_capitalization_matches_selected_model():

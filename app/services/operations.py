@@ -1,7 +1,7 @@
 """Синхронизация операций из T-Invest API → таблица transactions.
 
 Использует постраничный GetOperationsByCursor и дедупликацию по note='op:<id>'.
-Импортирует: buy, sell, coupon, dividend.
+Импортирует: buy, sell, coupon, dividend и внешние вводы/выводы денег.
 Пропускает: налоги, комиссии (они уже внутри payment), service-операции.
 
 Запуск: python -m app.cli sync-ops [--days N]
@@ -23,6 +23,12 @@ _KIND_MAP = {
     "OPERATION_TYPE_DELIVERY_SELL":  "sell",
     "OPERATION_TYPE_COUPON":         "coupon",
     "OPERATION_TYPE_DIVIDEND":       "dividend",
+    "OPERATION_TYPE_INPUT":          "topup",
+    "OPERATION_TYPE_OUTPUT":         "withdrawal",
+    "OPERATION_TYPE_INPUT_SWIFT":    "topup",
+    "OPERATION_TYPE_OUTPUT_SWIFT":   "withdrawal",
+    "OPERATION_TYPE_INPUT_ACQUIRING": "topup",
+    "OPERATION_TYPE_OUTPUT_ACQUIRING": "withdrawal",
     "OPERATION_TYPE_BOND_REPAYMENT": "sell",        # погашение = продажа по номиналу
     "OPERATION_TYPE_BOND_REPAYMENT_FULL": "sell",
 }
